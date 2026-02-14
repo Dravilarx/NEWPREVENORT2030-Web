@@ -10,7 +10,16 @@ export default function ConfigPage() {
     const [loading, setLoading] = useState(false)
 
     // Form states
-    const [newEmpresa, setNewEmpresa] = useState('')
+    const [empresaForm, setEmpresaForm] = useState({
+        rut_empresa: '',
+        nombre: '',
+        giro: '',
+        direccion: '',
+        email_contacto: '',
+        faenas: [] as { nombre_faena: string, altitud: number }[]
+    })
+    const [newFaena, setNewFaena] = useState({ nombre: '', altitud: 0 })
+
     const [newCargo, setNewCargo] = useState({
         nombre: '',
         es_gran_altura: false,
@@ -33,10 +42,51 @@ export default function ConfigPage() {
     }
 
     async function addEmpresa() {
-        if (!newEmpresa) return
-        await supabase.from('empresas').insert([{ nombre: newEmpresa }])
-        setNewEmpresa('')
+        if (!empresaForm.nombre || !empresaForm.rut_empresa) {
+            alert('Nombre y RUT son obligatorios')
+            return
+        }
+
+        const { error } = await supabase.from('empresas').insert([{
+            rut_empresa: empresaForm.rut_empresa,
+            nombre: empresaForm.nombre,
+            giro: empresaForm.giro,
+            direccion: empresaForm.direccion,
+            email_contacto: empresaForm.email_contacto,
+            faenas: empresaForm.faenas
+        }])
+
+        if (error) {
+            console.error(error)
+            alert('Error al agregar empresa: ' + error.message)
+            return
+        }
+
+        setEmpresaForm({
+            rut_empresa: '',
+            nombre: '',
+            giro: '',
+            direccion: '',
+            email_contacto: '',
+            faenas: []
+        })
         fetchData()
+    }
+
+    const addFaenaToLocal = () => {
+        if (!newFaena.nombre) return
+        setEmpresaForm({
+            ...empresaForm,
+            faenas: [...empresaForm.faenas, { nombre_faena: newFaena.nombre, altitud: newFaena.altitud }]
+        })
+        setNewFaena({ nombre: '', altitud: 0 })
+    }
+
+    const removeFaenaFromLocal = (index: number) => {
+        setEmpresaForm({
+            ...empresaForm,
+            faenas: empresaForm.faenas.filter((_, i) => i !== index)
+        })
     }
 
     async function addCargo() {
@@ -55,7 +105,7 @@ export default function ConfigPage() {
     return (
         <div className="config-page animate-fade">
             <header className="page-header">
-                <h1>⚙️ Configuración del Sistema</h1>
+                <h1>Configuración del Sistema</h1>
                 <p>Gestión de baterías de exámenes, cargos y empresas clientes.</p>
             </header>
 
@@ -64,13 +114,13 @@ export default function ConfigPage() {
                     className={`tab-btn ${activeTab === 'empresas' ? 'active' : ''}`}
                     onClick={() => setActiveTab('empresas')}
                 >
-                    🏢 Empresas
+                    Empresas
                 </button>
                 <button
                     className={`tab-btn ${activeTab === 'cargos' ? 'active' : ''}`}
                     onClick={() => setActiveTab('cargos')}
                 >
-                    🔧 Cargos y Baterías
+                    Cargos y Baterías
                 </button>
             </div>
 
@@ -78,24 +128,111 @@ export default function ConfigPage() {
                 {activeTab === 'empresas' ? (
                     <div className="empresas-section">
                         <h3>Gestión de Empresas</h3>
-                        <div className="add-form">
-                            <input
-                                type="text"
-                                placeholder="Nombre de la nueva empresa"
-                                value={newEmpresa}
-                                onChange={(e) => setNewEmpresa(e.target.value)}
-                            />
-                            <button className="btn btn-primary" onClick={addEmpresa}>Agregar Empresa</button>
+                        <div className="add-form vertical">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>RUT Empresa</label>
+                                    <input
+                                        type="text"
+                                        placeholder="12.345.678-9"
+                                        value={empresaForm.rut_empresa}
+                                        onChange={(e) => setEmpresaForm({ ...empresaForm, rut_empresa: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Nombre Fantasía</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre de la empresa"
+                                        value={empresaForm.nombre}
+                                        onChange={(e) => setEmpresaForm({ ...empresaForm, nombre: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Giro</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Actividad económica"
+                                        value={empresaForm.giro}
+                                        onChange={(e) => setEmpresaForm({ ...empresaForm, giro: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Email Contacto</label>
+                                    <input
+                                        type="email"
+                                        placeholder="contacto@empresa.cl"
+                                        value={empresaForm.email_contacto}
+                                        style={{ padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                                        onChange={(e) => setEmpresaForm({ ...empresaForm, email_contacto: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Dirección Casa Matriz</label>
+                                <input
+                                    type="text"
+                                    placeholder="Calle, Ciudad"
+                                    value={empresaForm.direccion}
+                                    onChange={(e) => setEmpresaForm({ ...empresaForm, direccion: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="faenas-builder mt-4">
+                                <h4>Gestión de Faenas y Altitud</h4>
+                                <div className="faena-input-row">
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre Faena (Ej: Los Pelambres)"
+                                        value={newFaena.nombre}
+                                        onChange={e => setNewFaena({ ...newFaena, nombre: e.target.value })}
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="msnm"
+                                        value={newFaena.altitud || ''}
+                                        style={{ width: '100px', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)' }}
+                                        onChange={e => setNewFaena({ ...newFaena, altitud: Number(e.target.value) })}
+                                    />
+                                    <button className="btn btn-secondary" onClick={addFaenaToLocal} type="button">Añadir Faena</button>
+                                </div>
+
+                                <div className="faenas-list mt-2">
+                                    {empresaForm.faenas.map((f, i) => (
+                                        <div key={i} className="faena-tag">
+                                            <span>{f.nombre_faena} ({f.altitud} msnm)</span>
+                                            <button onClick={() => removeFaenaFromLocal(i)}>×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button className="btn btn-primary mt-4" onClick={addEmpresa}>Guardar Empresa Completa</button>
                         </div>
 
-                        <ul className="list">
+                        <div className="empresas-list-grid">
                             {empresas.map(e => (
-                                <li key={e.id} className="list-item">
-                                    <span>{e.nombre}</span>
-                                    <span className="badge-id">ID: {e.id.slice(0, 8)}</span>
-                                </li>
+                                <div key={e.id} className="empresa-item-card">
+                                    <div className="empresa-main">
+                                        <strong>{e.nombre}</strong>
+                                        <span className="emp-rut">{e.rut_empresa}</span>
+                                    </div>
+                                    <div className="empresa-details">
+                                        <span>{e.giro}</span>
+                                        <span>{e.email_contacto}</span>
+                                    </div>
+                                    {e.faenas && e.faenas.length > 0 && (
+                                        <div className="faenas-summary">
+                                            {e.faenas.length} Faenas registradas
+                                        </div>
+                                    )}
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     </div>
                 ) : (
                     <div className="cargos-section">
@@ -177,18 +314,33 @@ export default function ConfigPage() {
 
                 .checkbox-group { display: flex; align-items: center; gap: 0.75rem; margin: 0.5rem 0; font-size: 0.9rem; font-weight: 600; }
                 
-                .list { list-style: none; padding: 0; }
-                .list-item { display: flex; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--border-dim); }
-                .badge-id { font-size: 0.7rem; color: var(--text-muted); font-family: monospace; opacity: 0.6; }
+                .faenas-builder { background: rgba(0,0,0,0.05); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color); }
+                [data-theme='dark'] .faenas-builder { background: rgba(255,255,255,0.02); }
+                .faena-input-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+                .faenas-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+                .faena-tag { 
+                    background: var(--brand-primary-light); color: var(--brand-primary); 
+                    padding: 0.4rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700;
+                    display: flex; align-items: center; gap: 0.5rem;
+                }
+                .faena-tag button { background: none; border: none; color: var(--brand-primary); cursor: pointer; font-size: 1.1rem; padding: 0; line-height: 1; }
                 
-                .items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
-                .cargo-card { background: var(--bg-surface); border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; transition: var(--transition); }
-                .cargo-card:hover { border-color: var(--brand-primary); }
-                .cargo-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-                .altitude-badge { font-size: 0.65rem; background: var(--brand-primary-light); color: var(--brand-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 800; }
-                .cargo-limits { font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 1rem; font-weight: 600; }
-                
-                .mt-4 { margin-top: 2rem; }
+                .empresas-list-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-top: 2rem; }
+                .empresa-item-card { 
+                    background: var(--bg-surface); border: 1px solid var(--border-color); 
+                    padding: 1.5rem; border-radius: 12px; transition: var(--transition);
+                }
+                .empresa-item-card:hover { border-color: var(--brand-primary); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+                .empresa-main { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.75rem; }
+                .empresa-main strong { font-size: 1.1rem; color: var(--text-main); }
+                .emp-rut { font-size: 0.8rem; color: var(--brand-primary); font-weight: 700; opacity: 0.8; }
+                .empresa-details { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-muted); }
+                .faenas-summary { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-dim); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--brand-primary); }
+
+                .mt-2 { margin-top: 0.5rem; }
+                .mt-4 { margin-top: 1.5rem; }
+                .btn-secondary { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
+                .btn-secondary:hover { background: var(--border-dim); }
             `}</style>
         </div>
     )
