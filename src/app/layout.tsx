@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
+import AppWrapper from "@/components/layout/AppWrapper";
 
 export const metadata: Metadata = {
   title: "Prevenort | Sistema Médico Fast-Track",
@@ -14,32 +14,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet" />
+      </head>
       <body>
-        <div className="app-container">
-          <Sidebar />
-          <main className="main-content">
-            {children}
-          </main>
-        </div>
-
-        <style dangerouslySetInnerHTML={{
-          __html: `
-          .app-container {
-            display: flex;
-            min-height: 100vh;
-          }
-          .main-content {
-            flex: 1;
-            margin-left: 260px;
-            padding: 2rem;
-            background-color: var(--bg-app);
-          }
-          @media (max-width: 1024px) {
-            .main-content {
-              margin-left: 0;
-            }
-          }
-        `}} />
+        <AppWrapper>
+          {children}
+        </AppWrapper>
       </body>
     </html>
   );

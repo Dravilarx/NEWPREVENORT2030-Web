@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
+import WorkList from '@/components/WorkList'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -9,16 +12,31 @@ export default function Dashboard() {
     no_aptos: 0,
     pendientes: 0
   })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Simulación de carga de datos inicial
-    setStats({
-      aptos: 154,
-      remediacion: 28,
-      no_aptos: 12,
-      pendientes: 45
-    })
+    fetchRealStats()
   }, [])
+
+  async function fetchRealStats() {
+    const { data: atenciones } = await supabase.from('atenciones').select('estado_aptitud')
+
+    if (atenciones) {
+      const counts = atenciones.reduce((acc: any, at: any) => {
+        const estado = at.estado_aptitud || 'pendiente'
+        acc[estado] = (acc[estado] || 0) + 1
+        return acc
+      }, { apto: 0, remediacion: 0, no_apto: 0, pendiente: 0 })
+
+      setStats({
+        aptos: counts.apto,
+        remediacion: counts.remediacion,
+        no_aptos: counts.no_apto,
+        pendientes: counts.pendiente
+      })
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="dashboard animate-fade">
@@ -28,9 +46,9 @@ export default function Dashboard() {
           <p>Bienvenido al Centro Médico Prevenort. Resumen operativo del día.</p>
         </div>
         <div className="header-actions">
-          <button className="btn btn-primary">
+          <Link href="/admision" className="btn btn-primary">
             <span>+</span> Nueva Atención
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -58,39 +76,8 @@ export default function Dashboard() {
       </section>
 
       <div className="content-grid">
-        <div className="card table-card">
-          <h3>Últimas Atenciones</h3>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Trabajador</th>
-                <th>Cargo</th>
-                <th>Empresa</th>
-                <th>Estado</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { name: 'Juan Pérez', cargo: 'Operador CAEX', empresa: 'Delta Minería', status: 'Apto' },
-                { name: 'María González', cargo: 'Mantenedor', empresa: 'Servicios Norte', status: 'Remediación' },
-                { name: 'Roberto Díaz', cargo: 'Eléctrico', empresa: 'ConstruMining', status: 'Pendiente' },
-                { name: 'Ana Silva', cargo: 'Administrativo', empresa: 'Delta Minería', status: 'Apto' },
-              ].map((row, i) => (
-                <tr key={i}>
-                  <td><strong>{row.name}</strong></td>
-                  <td>{row.cargo}</td>
-                  <td>{row.empresa}</td>
-                  <td>
-                    <span className={`badge badge-${row.status.toLowerCase()}`}>
-                      {row.status}
-                    </span>
-                  </td>
-                  <td><button className="text-btn">Ver Detalle</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="table-area">
+          <WorkList limit={10} />
         </div>
 
         <div className="card ai-card glass">
@@ -105,6 +92,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
 
       <style jsx>{`
         .dashboard {
@@ -121,7 +109,6 @@ export default function Dashboard() {
 
         h1 {
           font-size: 2rem;
-          color: var(--brand-secondary);
           margin-bottom: 0.25rem;
         }
 
@@ -136,13 +123,14 @@ export default function Dashboard() {
         }
 
         .kpi-card {
-          background: white;
+          background: var(--bg-card);
           padding: 1.5rem;
           border-radius: var(--radius-md);
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
           box-shadow: var(--shadow-sm);
+          border: 1px solid var(--border-color);
         }
 
         .kpi-label {
@@ -203,9 +191,9 @@ export default function Dashboard() {
           font-weight: 600;
         }
 
-        .badge-apto { background: #D1FAE5; color: #065F46; }
-        .badge-remediación { background: #FEF3C7; color: #92400E; }
-        .badge-pendiente { background: #E0F2FE; color: #075985; }
+        .badge-apto { background: var(--brand-primary-light); color: var(--brand-primary); }
+        .badge-remediación { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .badge-pendiente { background: var(--bg-app); color: var(--text-muted); }
 
         .text-btn {
           background: none;
