@@ -671,75 +671,6 @@ export default function ConfigPage() {
                             ))}
                         </div>
 
-                        {/* ═══ Cargos Definidos ═══ */}
-                        {/* Panel Lateral (Drawer) para Cargos */}
-                        <div className={`side-panel ${showCargoPanel ? 'open' : ''}`}>
-                            <div className="side-panel-overlay" onClick={closeCargoPanel}></div>
-                            <div className="side-panel-content">
-                                <div className="side-panel-header">
-                                    <h3>{editingCargo ? '✏️ Editar Cargo' : '👷 Nuevo Cargo'}</h3>
-                                    <button className="btn-close" onClick={closeCargoPanel}>&times;</button>
-                                </div>
-                                <p className="section-hint">Define los parámetros de salud críticos para este cargo.</p>
-
-                                <div className="add-form vertical mt-4">
-                                    <div className="form-group">
-                                        <label>Nombre del Cargo</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ej: Operador CAEX"
-                                            value={newCargo.nombre}
-                                            onChange={e => setNewCargo({ ...newCargo, nombre: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.8rem', padding: '0.5rem 0' }}>
-                                        <input
-                                            type="checkbox"
-                                            id="chk-altura"
-                                            checked={newCargo.es_gran_altura}
-                                            onChange={e => setNewCargo({ ...newCargo, es_gran_altura: e.target.checked })}
-                                            style={{ width: '18px', height: '18px' }}
-                                        />
-                                        <label htmlFor="chk-altura" style={{ marginBottom: 0, cursor: 'pointer' }}>Exposición a Gran Altura (&gt;3000 msnm)</label>
-                                    </div>
-
-                                    <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                        🩺 Límites de Aptitud Médica
-                                    </div>
-
-                                    <div className="form-row">
-                                        <div className="form-group" style={{ flex: 1 }}>
-                                            <label>PA Sistólica Máx</label>
-                                            <input
-                                                type="number"
-                                                value={newCargo.pa_sistolica}
-                                                onChange={e => setNewCargo({ ...newCargo, pa_sistolica: Number(e.target.value) })}
-                                            />
-                                        </div>
-                                        <div className="form-group" style={{ flex: 1 }}>
-                                            <label>PA Diastólica Máx</label>
-                                            <input
-                                                type="number"
-                                                value={newCargo.pa_diastolica}
-                                                onChange={e => setNewCargo({ ...newCargo, pa_diastolica: Number(e.target.value) })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Glicemia Máxima (mg/dL)</label>
-                                        <input
-                                            type="number"
-                                            value={newCargo.glicemia}
-                                            onChange={e => setNewCargo({ ...newCargo, glicemia: Number(e.target.value) })}
-                                        />
-                                    </div>
-
-                                    <button className="btn btn-primary mt-8 full-width" onClick={saveCargo}>
-                                        {editingCargo ? 'Guardar Cambios' : 'Registrar Cargo'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
 
                     </>
                 )}
@@ -1042,6 +973,74 @@ export default function ConfigPage() {
 
                         {protocolosView === 'cargos' && (
                             <>
+                                {/* Panel Lateral (Drawer) para Cargos */}
+                                <div className={`side-panel ${showCargoPanel ? 'open' : ''}`}>
+                                    <div className="side-panel-overlay" onClick={closeCargoPanel}></div>
+                                    <div className="side-panel-content">
+                                        <div className="side-panel-header">
+                                            <h3>{editingCargo ? '✏️ Editar Cargo' : '👷 Nuevo Cargo'}</h3>
+                                            <button className="btn-close" onClick={closeCargoPanel}>&times;</button>
+                                        </div>
+                                        <p className="section-hint">Define los parámetros de salud críticos para este cargo.</p>
+
+                                        <div className="add-form vertical mt-4">
+                                            <div className="form-group">
+                                                <label>Nombre del Cargo</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ej: Operador CAEX"
+                                                    value={newCargo.nombre}
+                                                    onChange={e => setNewCargo({ ...newCargo, nombre: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.8rem', padding: '0.5rem 0' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    id="chk-altura"
+                                                    checked={newCargo.es_gran_altura}
+                                                    onChange={e => setNewCargo({ ...newCargo, es_gran_altura: e.target.checked })}
+                                                    style={{ width: '18px', height: '18px' }}
+                                                />
+                                                <label htmlFor="chk-altura" style={{ marginBottom: 0, cursor: 'pointer' }}>Exposición a Gran Altura (&gt;3000 msnm)</label>
+                                            </div>
+
+                                            <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                🩺 Límites de Aptitud Médica
+                                            </div>
+
+                                            <div className="form-row">
+                                                <div className="form-group" style={{ flex: 1 }}>
+                                                    <label>PA Sistólica Máx</label>
+                                                    <input
+                                                        type="number"
+                                                        value={newCargo.pa_sistolica}
+                                                        onChange={e => setNewCargo({ ...newCargo, pa_sistolica: Number(e.target.value) })}
+                                                    />
+                                                </div>
+                                                <div className="form-group" style={{ flex: 1 }}>
+                                                    <label>PA Diastólica Máx</label>
+                                                    <input
+                                                        type="number"
+                                                        value={newCargo.pa_diastolica}
+                                                        onChange={e => setNewCargo({ ...newCargo, pa_diastolica: Number(e.target.value) })}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Glicemia Máxima (mg/dL)</label>
+                                                <input
+                                                    type="number"
+                                                    value={newCargo.glicemia}
+                                                    onChange={e => setNewCargo({ ...newCargo, glicemia: Number(e.target.value) })}
+                                                />
+                                            </div>
+
+                                            <button className="btn btn-primary mt-8 full-width" onClick={saveCargo}>
+                                                {editingCargo ? 'Guardar Cambios' : 'Registrar Cargo'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                     <div>
                                         <h4>Catálogo Maestro de Cargos</h4>

@@ -8,6 +8,7 @@ export default function PortalEmpresaPage() {
     const [empresas, setEmpresas] = useState<any[]>([])
     const [empresaId, setEmpresaId] = useState('')
     const [stats, setStats] = useState({ aptos: 0, no_aptos: 0, remediacion: 0, total: 0 })
+    const [statsByCargo, setStatsByCargo] = useState<any[]>([])
     const [historial, setHistorial] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [bulkFile, setBulkFile] = useState<File | null>(null)
@@ -40,17 +41,17 @@ export default function PortalEmpresaPage() {
                 const estado = at.estado_aptitud || 'pendiente'
                 acc[estado] = (acc[estado] || 0) + 1
                 return acc
-            }, { apto: 0, no_apto: 0, remediacion: 0 })
+            }, { apto: 0, no__apto: 0, remediacion: 0 })
 
             setStats({
-                aptos: counts.apto,
-                no_aptos: counts.no_apto,
-                remediacion: counts.remediacion,
+                aptos: counts.apto || 0,
+                no_aptos: counts.no_apto || 0,
+                remediacion: counts.remediacion || 0,
                 total: atenciones.length
             })
         }
 
-        // 2. Historial de trabajadores
+        // 2. Historial de trabajadores y Agregación por Cargo
         const { data: list } = await supabase
             .from('atenciones')
             .select(`
@@ -65,7 +66,29 @@ export default function PortalEmpresaPage() {
             .eq('empresa_id', empresaId)
             .order('created_at', { ascending: false })
 
-        if (list) setHistorial(list)
+        if (list) {
+            setHistorial(list)
+
+            // Calcular cumplimiento por cargo
+            const cargoMap: any = {}
+            list.forEach((at: any) => {
+                const cName = at.cargos?.nombre_cargo || 'Sin Cargo'
+                if (!cargoMap[cName]) {
+                    cargoMap[cName] = { total: 0, aptos: 0 }
+                }
+                cargoMap[cName].total++
+                if (at.estado_aptitud === 'apto') cargoMap[cName].aptos++
+            })
+
+            const cargoStatsArr = Object.entries(cargoMap).map(([name, data]: [string, any]) => ({
+                name,
+                total: data.total,
+                aptos: data.aptos,
+                percentage: Math.round((data.aptos / data.total) * 100)
+            })).sort((a, b) => b.percentage - a.percentage)
+
+            setStatsByCargo(cargoStatsArr)
+        }
         setLoading(false)
     }
 
@@ -152,30 +175,65 @@ export default function PortalEmpresaPage() {
 
             {empresaId && (
                 <div className="portal-content-grid">
-                    <div className="main-side">
-                        <section className="stats-row">
+                    <div className="main-dashboard">
+                        <div className="stats-row">
                             <div className="stat-card">
-                                <span className="label">Total Evaluados</span>
+                                <span className="stat-icon">👥</span>
                                 <span className="value">{stats.total}</span>
+                                <span className="label">Evaluaciones Totales</span>
                             </div>
                             <div className="stat-card success">
-                                <span className="label">Aptos</span>
+                                <span className="stat-icon">✅</span>
                                 <span className="value">{stats.aptos}</span>
+                                <span className="label">Personal Apto</span>
                             </div>
                             <div className="stat-card warning">
-                                <span className="label">En Remediación</span>
+                                <span className="stat-icon">⚠️</span>
                                 <span className="value">{stats.remediacion}</span>
+                                <span className="label">En Remedación</span>
                             </div>
                             <div className="stat-card danger">
-                                <span className="label">No Aptos</span>
+                                <span className="stat-icon">🚫</span>
                                 <span className="value">{stats.no_aptos}</span>
+                                <span className="label">No Aptos</span>
                             </div>
-                        </section>
+                        </div>
 
-                        <div className="card mt-4">
-                            <h3>Gestión de Dotación</h3>
+                        {/* Cumplimiento por Cargo */}
+                        <div className="card glass mt-4 compliance-section">
+                            <h3>Cumplimiento por Cargo Operativo</h3>
+                            <div className="compliance-grid">
+                                {statsByCargo.map(c => (
+                                    <div key={c.name} className="compliance-item">
+                                        <div className="compliance-info">
+                                            <span className="cargo-name">{c.name}</span>
+                                            <span className="cargo-stat">{c.aptos}/{c.total} Aptos ({c.percentage}%)</span>
+                                        </div>
+                                        <div className="progress-bar-bg">
+                                            <div
+                                                className={`progress-bar-fill ${c.percentage > 80 ? 'high' : c.percentage > 50 ? 'med' : 'low'}`}
+                                                style={{ width: `${c.percentage}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {statsByCargo.length === 0 && <p className="empty-msg">No hay datos suficientes para generar estadísticas por cargo.</p>}
+                            </div>
+                        </div>
+
+                        <div className="card glass mt-4">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3>Gestión de Dotación y Decisiones</h3>
+                                <div className="legend">
+                                    <span className="legend-item"><span className="dot dot-apto"></span> Apto</span>
+                                    <span className="legend-item"><span className="dot dot-no_apto"></span> No Apto</span>
+                                    <span className="legend-item"><span className="dot dot-remediacion"></span> Remediación</span>
+                                </div>
+                            </div>
                             {loading ? (
-                                <p className="p-4">Cargando datos...</p>
+                                <p>Cargando datos...</p>
+                            ) : historial.length === 0 ? (
+                                <p>No hay registros de atenciones para esta empresa.</p>
                             ) : (
                                 <table className="data-table">
                                     <thead>
@@ -201,26 +259,32 @@ export default function PortalEmpresaPage() {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    {at.estado_aptitud === 'remediacion' && at.aprobacion_empresa === 'pendiente' ? (
-                                                        <div className="btn-group">
-                                                            <button
-                                                                className="btn-mini btn-success"
-                                                                onClick={() => handleCompanyDecision(at.id, 'aprobado')}
-                                                            >
-                                                                Aprobar ✅
-                                                            </button>
-                                                            <button
-                                                                className="btn-mini btn-danger"
-                                                                onClick={() => handleCompanyDecision(at.id, 'rechazado')}
-                                                            >
-                                                                Rechazar ❌
-                                                            </button>
-                                                        </div>
-                                                    ) : (
+                                                    {at.estado_aptitud === 'remediacion' ? (
+                                                        at.aprobacion_empresa === 'pendiente' ? (
+                                                            <div className="btn-group">
+                                                                <button
+                                                                    className="btn-mini btn-success"
+                                                                    onClick={() => handleCompanyDecision(at.id, 'aprobado')}
+                                                                >
+                                                                    Aprobar ✅
+                                                                </button>
+                                                                <button
+                                                                    className="btn-mini btn-danger"
+                                                                    onClick={() => handleCompanyDecision(at.id, 'rechazado')}
+                                                                >
+                                                                    Rechazar ❌
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className={`decision-${at.aprobacion_empresa}`}>
+                                                                {at.aprobacion_empresa?.toUpperCase()}
+                                                            </span>
+                                                        )
+                                                    ) : at.estado_aptitud === 'no_apto' ? (
                                                         <span className={`decision-${at.aprobacion_empresa}`}>
                                                             {at.aprobacion_empresa?.toUpperCase()}
                                                         </span>
-                                                    )}
+                                                    ) : null}
                                                 </td>
                                             </tr>
                                         ))}
@@ -311,12 +375,35 @@ export default function PortalEmpresaPage() {
                     border: 1px solid var(--border-color);
                 }
 
-                .stat-card .label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
-                .stat-card .value { font-size: 2rem; font-weight: 800; font-family: 'Outfit', sans-serif; color: var(--text-main); }
+                .stat-card .label { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+                .stat-card .value { font-size: 2.2rem; font-weight: 900; font-family: 'Outfit', sans-serif; color: var(--text-main); line-height: 1; }
+                .stat-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
                 
-                .stat-card.success .value { color: var(--success); }
-                .stat-card.warning .value { color: var(--warning); }
-                .stat-card.danger .value { color: var(--danger); }
+                .stat-card.success .value { color: #22c55e; }
+                .stat-card.warning .value { color: #f59e0b; }
+                .stat-card.danger .value { color: #ef4444; }
+
+                .compliance-section { padding: 1.5rem; }
+                .compliance-section h3 { margin-bottom: 1.5rem; font-size: 1.1rem; }
+                .compliance-grid { display: grid; gap: 1.2rem; }
+                .compliance-item { display: flex; flex-direction: column; gap: 0.5rem; }
+                .compliance-info { display: flex; justify-content: space-between; align-items: flex-end; }
+                .cargo-name { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+                .cargo-stat { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+                
+                .progress-bar-bg { height: 8px; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; }
+                .progress-bar-fill { height: 100%; border-radius: 10px; transition: width 1s ease-out; }
+                .progress-bar-fill.high { background: linear-gradient(90deg, #22c55e, #4ade80); box-shadow: 0 0 10px rgba(34, 197, 94, 0.2); }
+                .progress-bar-fill.med { background: linear-gradient(90deg, #f59e0b, #fbbf24); box-shadow: 0 0 10px rgba(245, 158, 11, 0.2); }
+                .progress-bar-fill.low { background: linear-gradient(90deg, #ef4444, #f87171); box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); }
+
+                .legend { display: flex; gap: 1rem; }
+                .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+                .dot { width: 8px; height: 8px; border-radius: 50%; }
+                .dot-apto { background: #22c55e; }
+                .dot-no_apto { background: #ef4444; }
+                .dot-remediacion { background: #f59e0b; }
+                .empty-msg { font-style: italic; color: var(--text-muted); font-size: 0.9rem; }
 
                 .mt-4 { margin-top: 2rem; }
 
@@ -330,7 +417,7 @@ export default function PortalEmpresaPage() {
                     font-size: 0.75rem;
                     font-weight: 700;
                 }
-                .badge-apto { background: var(--brand-primary-light); color: var(--brand-primary); }
+                .badge-apto { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
                 .badge-no_apto { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
                 .badge-remediacion { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
                 .badge-pendiente { background: var(--bg-app); color: var(--text-muted); }
