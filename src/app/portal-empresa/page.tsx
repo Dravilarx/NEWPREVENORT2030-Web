@@ -100,7 +100,7 @@ export default function PortalEmpresaPage() {
 
             const workersToRegister = lines.slice(1).filter(l => l.trim().length > 0).map(line => {
                 const parts = line.split(',').map(s => s.trim())
-                const [rut, nom, apP, apM, email, fNac, sx] = parts
+                const [rut, nom, apP, apM, email, fNac, sx, cargo] = parts
                 return {
                     rut: formatearRUT(rut),
                     nombres: nom,
@@ -109,7 +109,8 @@ export default function PortalEmpresaPage() {
                     nombre_completo: `${nom} ${apP} ${apM}`.trim(),
                     email: email || null,
                     fecha_nacimiento: fNac || null,
-                    sexo: sx || null
+                    sexo: sx || null,
+                    cargo: cargo || null
                 }
             })
 
@@ -235,7 +236,7 @@ export default function PortalEmpresaPage() {
                                 <h3>Pre-carga de Dotación</h3>
                             </div>
                             <p className="bulk-text">Suba su nómina de trabajadores para agilizar el proceso de ingreso en centro médico.</p>
-                            <p className="bulk-text" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CSV: RUT, Nombres, ApPaterno, ApMaterno, Email, FechaNac, Sexo.</p>
+                            <p className="bulk-text" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CSV: RUT, Nombres, ApPaterno, ApMaterno, Email, FechaNac, Sexo, Cargo.</p>
 
                             <div className="bulk-upload-zone">
                                 <input
