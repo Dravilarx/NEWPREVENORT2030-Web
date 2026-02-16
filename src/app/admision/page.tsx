@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { formatearRUT } from '@/lib/skills/formateadorRUT'
+import { formatearRUT, normalizarRUT } from '@/lib/skills/formateadorRUT'
 
 // ── Interfaces ──────────────────────────────────────────────
 interface Empresa {
@@ -42,6 +42,7 @@ interface Bateria {
 interface Asignacion {
     id: string;
     empresa_id: string;
+    faena_nombre?: string;
     cargo_id: string;
     bateria_id: string;
     baterias?: Bateria;
@@ -89,6 +90,7 @@ export default function AdmisionPage() {
     const [sexo, setSexo] = useState('')
     const [email, setEmail] = useState('')
     const [empresaId, setEmpresaId] = useState('')
+    const [faena, setFaena] = useState('')
     const [cargoId, setCargoId] = useState('')
     const [workerFound, setWorkerFound] = useState(false)
 
@@ -103,6 +105,14 @@ export default function AdmisionPage() {
         setRut(formatted)
     }
 
+    const handleRutBlur = () => {
+        if (!rut) return
+        const normalized = normalizarRUT(rut)
+        setRut(normalized)
+        // La búsqueda se hace después de la normalización
+        setTimeout(() => buscarTrabajador(), 0)
+    }
+
     useEffect(() => {
         fetchMaestros()
         fetchRecentAdmisions()
@@ -110,20 +120,24 @@ export default function AdmisionPage() {
 
     // Battery auto-suggestion
     useEffect(() => {
-        if (empresaId && cargoId) {
-            const match = asignaciones.find(a => a.empresa_id === empresaId && a.cargo_id === cargoId)
+        if (empresaId && cargoId && faena) {
+            const match = asignaciones.find(a =>
+                a.empresa_id === empresaId &&
+                a.cargo_id === cargoId &&
+                (a.faena_nombre === faena || !a.faena_nombre)
+            )
             setBateriaSugerida(match?.baterias || null)
         } else {
             setBateriaSugerida(null)
         }
-    }, [empresaId, cargoId, asignaciones])
+    }, [empresaId, cargoId, faena, asignaciones])
 
     async function fetchMaestros() {
-        const { data: emp } = await supabase.from('empresas').select('id, nombre, rut_empresa')
+        const { data: emp } = await supabase.from('empresas').select('id, nombre, rut_empresa, faenas')
         const { data: car } = await supabase.from('cargos').select('id, nombre_cargo, es_gran_altura')
         const { data: asig } = await supabase.from('empresa_cargo_baterias').select('*, baterias(*, bateria_items(*, prestaciones(*)))')
 
-        if (emp) setEmpresas(emp)
+        if (emp) setEmpresas(emp as any)
         if (car) setCargos(car as Cargo[])
         if (asig) setAsignaciones(asig as Asignacion[])
     }
@@ -320,7 +334,7 @@ export default function AdmisionPage() {
                 const parts = line.split(',').map(s => s.trim())
                 const [csvRut, nom, apP, apM, csvEmail, fNac, sx, cargo] = parts
                 return {
-                    rut: formatearRUT(csvRut),
+                    rut: normalizarRUT(csvRut),
                     nombres: nom,
                     apellido_paterno: apP,
                     apellido_materno: apM,
@@ -503,7 +517,7 @@ export default function AdmisionPage() {
                                     placeholder="12.345.678-9"
                                     value={rut}
                                     onChange={handleRutChange}
-                                    onBlur={buscarTrabajador}
+                                    onBlur={handleRutBlur}
                                     autoFocus
                                 />
                                 <button type="button" className="btn-rut-search" onClick={buscarTrabajador} disabled={loading}>
@@ -593,12 +607,21 @@ export default function AdmisionPage() {
                             <span>Asignación Ocupacional</span>
                         </div>
 
-                        <div className="form-row-2">
+                        <div className="form-row-3">
                             <div className="form-group">
                                 <label>Empresa</label>
-                                <select value={empresaId} onChange={e => setEmpresaId(e.target.value)} required>
+                                <select value={empresaId} onChange={e => { setEmpresaId(e.target.value); setFaena(''); }} required>
                                     <option value="">Seleccione...</option>
                                     {empresas.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Faena</label>
+                                <select value={faena} onChange={e => setFaena(e.target.value)} required disabled={!empresaId}>
+                                    <option value="">Seleccione...</option>
+                                    {(empresas.find(e => e.id === empresaId) as any)?.faenas?.map((f: any, idx: number) => (
+                                        <option key={idx} value={f.nombre_faena}>{f.nombre_faena}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="form-group">
@@ -636,9 +659,9 @@ export default function AdmisionPage() {
                                         <span className="ai-altitude">🏔️ Perfil Gran Altura Activo</span>
                                     )}
                                 </div>
-                            ) : cargoId && empresaId ? (
+                            ) : cargoId && empresaId && faena ? (
                                 <div className="ai-body">
-                                    <p className="ai-warn">⚠️ No hay batería configurada para esta combinación empresa-cargo.</p>
+                                    <p className="ai-warn">⚠️ No hay batería configurada para esta combinación empresa-faena-cargo.</p>
                                     {selectedCargo?.es_gran_altura && (
                                         <span className="ai-altitude">🏔️ Requiere evaluación de Gran Altura</span>
                                     )}
@@ -930,6 +953,7 @@ export default function AdmisionPage() {
                 .form-group input:focus, .form-group select:focus { border-color: var(--brand-primary); background: rgba(255,107,44,0.02); }
                 .form-group input:disabled, .form-group select:disabled { opacity: 0.5; cursor: not-allowed; }
                 .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+                .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
 
                 /* RUT Search */
                 .rut-search-row { display: flex; gap: 0.5rem; }

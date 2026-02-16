@@ -6,20 +6,17 @@
  */
 
 /**
- * Limpia y formatea un RUT chileno de forma continua.
- * Ejemplo: "123456789" -> "12.345.678-9"
+ * Limpia y formatea un RUT chileno de forma continua (para onChange).
+ * Ejemplo: "12345678" -> "1.234.567-8"
  */
 export const formatearRUT = (value: string): string => {
-    // 1. Limpiar el valor (dejar solo números y la letra K)
-    let cleanValue = value.replace(/[^0-9kK]/g, '').toUpperCase();
+    let clean = value.replace(/[^0-9kK]/g, '').toUpperCase();
+    if (clean.length === 0) return '';
+    if (clean.length === 1) return clean;
 
-    if (cleanValue.length === 0) return '';
+    const dv = clean.slice(-1);
+    let cuerpo = clean.slice(0, -1);
 
-    // 2. Separar el dígito verificador y la parte numérica
-    const dv = cleanValue.slice(-1);
-    let cuerpo = cleanValue.slice(0, -1);
-
-    // 3. Formatear el cuerpo con puntos (si tiene contenido)
     if (cuerpo.length > 0) {
         let formattedCuerpo = '';
         while (cuerpo.length > 3) {
@@ -34,33 +31,65 @@ export const formatearRUT = (value: string): string => {
 };
 
 /**
+ * Normaliza un RUT al estándar oficial del proyecto (XX.XXX.XXX-X).
+ * Incluye acolchado con ceros a la izquierda y cálculo de DV si falta.
+ * Ejemplo: "6089115" -> "06.089.115-0"
+ */
+export const normalizarRUT = (value: string): string => {
+    if (!value) return '';
+
+    const clean = value.replace(/[^0-9kK]/g, '').toUpperCase();
+    if (clean.length === 0) return '';
+
+    let body = '';
+    let dv = '';
+
+    // Lógica de separación
+    if (value.includes('-')) {
+        const parts = value.split('-');
+        body = parts[0].replace(/\D/g, '');
+        dv = parts[1].trim().toUpperCase().charAt(0);
+    } else if (clean.length >= 8) {
+        dv = clean.slice(-1);
+        body = clean.slice(0, -1);
+    } else {
+        body = clean;
+        dv = calcularDV(body);
+    }
+
+    // Acolchar cuerpo a 8 dígitos (06089115)
+    const paddedBody = body.padStart(8, '0');
+
+    return `${paddedBody.slice(0, 2)}.${paddedBody.slice(2, 5)}.${paddedBody.slice(5, 8)}-${dv}`;
+};
+
+/**
+ * Calcula el dígito verificador de un cuerpo de RUT
+ */
+export const calcularDV = (cuerpo: string): string => {
+    let suma = 0;
+    let multiplo = 2;
+
+    for (let i = cuerpo.length - 1; i >= 0; i--) {
+        suma += parseInt(cuerpo.charAt(i)) * multiplo;
+        multiplo = multiplo === 7 ? 2 : multiplo + 1;
+    }
+
+    const valor = 11 - (suma % 11);
+    if (valor === 11) return '0';
+    if (valor === 10) return 'K';
+    return valor.toString();
+};
+
+/**
  * Valida si un RUT es válido (algoritmo módulo 11)
  */
 export const validarRUT = (rut: string): boolean => {
     const cleanRut = rut.replace(/\./g, '').replace(/-/g, '').toUpperCase();
-    if (cleanRut.length < 8) return false;
+    if (cleanRut.length < 2) return false;
 
     const dv = cleanRut.slice(-1);
     const cuerpo = cleanRut.slice(0, -1);
 
-    let suma = 0;
-    let multiplo = 2;
-
-    for (let i = 1; i <= cuerpo.length; i++) {
-        const index = multiplo * parseInt(cleanRut.charAt(cuerpo.length - i));
-        suma = suma + index;
-        if (multiplo < 7) {
-            multiplo = multiplo + 1;
-        } else {
-            multiplo = 2;
-        }
-    }
-
-    const dvEsperado = 11 - (suma % 11);
-    let dvRes = '';
-    if (dvEsperado === 11) dvRes = '0';
-    else if (dvEsperado === 10) dvRes = 'K';
-    else dvRes = dvEsperado.toString();
-
-    return dvRes === dv;
+    return calcularDV(cuerpo) === dv;
 };

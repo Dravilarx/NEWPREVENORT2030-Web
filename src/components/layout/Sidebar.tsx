@@ -35,6 +35,7 @@ export default function Sidebar() {
     { name: 'Evaluación', href: '/evaluacion' },
     { name: 'Remediación', href: '/remediacion' },
     { name: 'Certificados', href: '/certificados' },
+    { name: 'Caja', href: '/caja' },
     { name: 'Portal Empresa', href: '/portal-empresa' },
     { name: 'Configuración', href: '/config' },
   ]
