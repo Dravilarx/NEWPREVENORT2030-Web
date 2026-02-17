@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { evaluarParametrosClinicos } from '@/lib/skills/evaluadorClinico'
 import { formatearRUT } from '@/lib/skills/formateadorRUT'
+import { getFormComponent } from './formularios'
 
 export default function EvaluacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
@@ -420,137 +421,18 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                     </div>
 
                                                     <div className="data-entry-area">
-                                                        {(ex.prestaciones?.tipo_formulario || 'default') === 'signos_vitales' ? (
-                                                            <div className="vital-signs-table card glass">
-                                                                <div className="vital-grid">
-                                                                    <div className="vital-item">
-                                                                        <label>Pulso</label>
-                                                                        <input type="number" value={res.pulso || ''} onChange={(e) => updateExamField(ex.id, 'pulso', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vital-item pa-group">
-                                                                        <label>P.A (Sis/Dia)</label>
-                                                                        <div className="flex-pa">
-                                                                            <input type="number" placeholder="Sis" value={res.pa_sistolica || ''} onChange={(e) => updateExamField(ex.id, 'pa_sistolica', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                            <span>/</span>
-                                                                            <input type="number" placeholder="Dia" value={res.pa_diastolica || ''} onChange={(e) => updateExamField(ex.id, 'pa_diastolica', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="vital-item">
-                                                                        <label>Peso (kg)</label>
-                                                                        <input type="number" value={res.peso || ''} onChange={(e) => updateExamField(ex.id, 'peso', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vital-item">
-                                                                        <label>Talla (m)</label>
-                                                                        <input type="number" step="0.01" value={res.talla || ''} onChange={(e) => updateExamField(ex.id, 'talla', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vital-item highlight">
-                                                                        <label>IMC</label>
-                                                                        <div className="calc-val">
-                                                                            {(res.peso && res.talla) ? (Number(res.peso) / (Number(res.talla) * Number(res.talla))).toFixed(1) : '--'}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="vital-item">
-                                                                        <label>Sat %</label>
-                                                                        <input type="number" value={res.saturometria || ''} onChange={(e) => updateExamField(ex.id, 'saturometria', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vital-item">
-                                                                        <label>Test Ruffier (C.)</label>
-                                                                        <div className="flex-pa">
-                                                                            <input type="number" placeholder="P1" value={res.pulso || ''} disabled />
-                                                                            <input type="number" placeholder="P2" value={res.pulso_post || ''} onChange={(e) => updateExamField(ex.id, 'pulso_post', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                            <input type="number" placeholder="P3" value={res.pulso_recuperacion || ''} onChange={(e) => updateExamField(ex.id, 'pulso_recuperacion', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="vital-item highlight">
-                                                                        <label>Resultado Ruffier</label>
-                                                                        <div className="calc-val">
-                                                                            {(res.pulso && res.pulso_post && res.pulso_recuperacion) ?
-                                                                                ((Number(res.pulso) + Number(res.pulso_post) + Number(res.pulso_recuperacion) - 200) / 10).toFixed(1) : '--'}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ) : (ex.prestaciones?.tipo_formulario || 'default') === 'test_visual' ? (
-                                                            <div className="visual-test-table card glass">
-                                                                <div className="vt-acuity-grid">
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Lejos OD</span>
-                                                                        <input type="text" value={res.lejos_od || ''} onChange={(e) => updateExamField(ex.id, 'lejos_od', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Lejos OI</span>
-                                                                        <input type="text" value={res.lejos_oi || ''} onChange={(e) => updateExamField(ex.id, 'lejos_oi', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Lejos Ambos</span>
-                                                                        <input type="text" value={res.lejos_ambos || ''} onChange={(e) => updateExamField(ex.id, 'lejos_ambos', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Cerca OD</span>
-                                                                        <input type="text" value={res.cerca_od || ''} onChange={(e) => updateExamField(ex.id, 'cerca_od', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Cerca OI</span>
-                                                                        <input type="text" value={res.cerca_oi || ''} onChange={(e) => updateExamField(ex.id, 'cerca_oi', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Cerca Ambos</span>
-                                                                        <input type="text" value={res.cerca_ambos || ''} onChange={(e) => updateExamField(ex.id, 'cerca_ambos', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ) : (ex.prestaciones?.tipo_formulario || 'default') === 'audiometria' ? (
-                                                            <div className="audiovestibular-table card glass">
-                                                                <div className="audio-grid">
-                                                                    <div className="audio-header">
-                                                                        <span>Hz</span><span>OD</span><span>OI</span>
-                                                                    </div>
-                                                                    {[500, 1000, 2000, 3000, 4000, 6000, 8000].map(freq => (
-                                                                        <div key={freq} className="audio-row">
-                                                                            <span className="freq-label">{freq}</span>
-                                                                            <select value={res[`audio_od_${freq}`] || ''} onChange={(e) => updateExamField(ex.id, `audio_od_${freq}`, e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'}>
-                                                                                <option value="">--</option>
-                                                                                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80].map(db => <option key={db} value={db}>{db}</option>)}
-                                                                            </select>
-                                                                            <select value={res[`audio_oi_${freq}`] || ''} onChange={(e) => updateExamField(ex.id, `audio_oi_${freq}`, e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'}>
-                                                                                <option value="">--</option>
-                                                                                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80].map(db => <option key={db} value={db}>{db}</option>)}
-                                                                            </select>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        ) : (ex.prestaciones?.tipo_formulario || 'default') === 'estilo_vida' ? (
-                                                            <div className="lifestyle-table card glass">
-                                                                <div className="ls-grid">
-                                                                    <div className="ls-item group-horizontal">
-                                                                        <div className="ls-field">
-                                                                            <label>¿Fuma?</label>
-                                                                            <div className="flex-si-no">
-                                                                                <button className={res.fuma === 'SI' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'fuma', 'SI')} disabled={!isEditable && ex.estado === 'finalizado'}>SI</button>
-                                                                                <button className={res.fuma === 'NO' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'fuma', 'NO')} disabled={!isEditable && ex.estado === 'finalizado'}>NO</button>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="ls-item">
-                                                                        <label>Actividad Física (hrs/sem)</label>
-                                                                        <input type="number" value={res.actividad_horas || ''} onChange={(e) => updateExamField(ex.id, 'actividad_horas', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="default-inputs">
-                                                                <div className="input-group">
-                                                                    <label>Resultado / Hallazgo</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={res.resultado || ''}
-                                                                        onChange={(e) => updateExamField(ex.id, 'resultado', e.target.value)}
-                                                                        disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                        {(() => {
+                                                            const FormComponent = getFormComponent(ex.prestaciones?.tipo_formulario)
+                                                            return (
+                                                                <FormComponent
+                                                                    examId={ex.id}
+                                                                    resultados={res}
+                                                                    updateField={updateExamField}
+                                                                    isEditable={isEditable}
+                                                                    isFinalizado={ex.estado === 'finalizado'}
+                                                                />
+                                                            )
+                                                        })()}
                                                     </div>
                                                 </div>
 
