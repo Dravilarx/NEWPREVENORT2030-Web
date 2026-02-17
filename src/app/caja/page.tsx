@@ -274,8 +274,21 @@ export default function CajaPage() {
         if (filterForma) list = list.filter(f => f.forma_pago === filterForma) // Assuming 'filterForma' is still a separate state
 
         list.sort((a, b) => {
-            let va: string | number, vb: string | number
-            if (sortCol === 'monto_total') { va = a.monto_total; vb = b.monto_total }
+            let va: string | number = '', vb: string | number = ''
+            if (sortCol === 'monto_total') {
+                va = a.monto_total
+                vb = b.monto_total
+            } else if (sortCol === 'fecha_emision') {
+                va = a.fecha_emision
+                vb = b.fecha_emision
+            } else if (sortCol === 'numero_factura') {
+                va = a.numero_factura
+                vb = b.numero_factura
+            } else if (sortCol === 'estado') {
+                va = a.estado
+                vb = b.estado
+            }
+
             if (va < vb) return sortDir === 'asc' ? -1 : 1
             if (va > vb) return sortDir === 'asc' ? 1 : -1
             return 0
