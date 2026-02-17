@@ -104,9 +104,9 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
         // 2. Simular Análisis IA Premium
         setTimeout(() => {
             const ex = examenes.find(e => e.id === exId)
-            const exNombre = ex?.prestaciones.nombre.toLowerCase() || ""
+            const tipoForm = ex?.prestaciones?.tipo_formulario || 'default'
 
-            if (exNombre.includes("signos")) {
+            if (tipoForm === 'signos_vitales') {
                 updateExamField(exId, 'pa_sistolica', '118')
                 updateExamField(exId, 'pa_diastolica', '76')
                 updateExamField(exId, 'pulso', '72')
@@ -114,9 +114,9 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                 updateExamField(exId, 'talla', '1.75')
                 updateExamField(exId, 'saturometria', '98')
                 updateExamField(exId, 'resultado', 'Analizado: PA 118/76, Pulso 72, IMC 24.5')
-            } else if (exNombre.includes("glicemia")) {
+            } else if (tipoForm === 'laboratorio') {
                 updateExamField(exId, 'resultado', '95')
-            } else if (exNombre.includes("psic")) {
+            } else if (tipoForm === 'psicologico' || tipoForm === 'psicotecnico') {
                 updateExamField(exId, 'resultado', 'Perfil Compatible')
             } else {
                 updateExamField(exId, 'resultado', 'Normal')
@@ -170,8 +170,10 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
         let finalResultado = res.resultado
         let extraFieldsToSave = { ...res }
 
+        const tipoForm = ex?.prestaciones?.tipo_formulario || 'default'
+
         // Si es Signos Vitales, recalculamos el summary y preparamos JSON
-        if (ex?.prestaciones.nombre.toLowerCase().includes('signos vitales')) {
+        if (tipoForm === 'signos_vitales') {
             const valP1 = Number(res.p1) || 0
             const valP2 = Number(res.p2) || 0
             const valP3 = Number(res.p3) || 0
@@ -188,7 +190,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
         }
 
         // Si es Test Visual, recalculamos el summary
-        if (ex?.prestaciones.nombre.toLowerCase().includes('test visual')) {
+        if (tipoForm === 'test_visual') {
             const summary = `VA Lejos: ${res.lejos_od || '-'}/${res.lejos_oi || '-'} | VA Cerca: ${res.cerca_od || '-'}/${res.cerca_oi || '-'}`
             finalResultado = JSON.stringify({
                 ...extraFieldsToSave,
@@ -197,7 +199,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
         }
 
         // Si es Estilo de Vida
-        if (ex?.prestaciones.nombre.toLowerCase().includes('estilo de vida')) {
+        if (tipoForm === 'estilo_vida') {
             const summary = `Fuma: ${res.fuma || 'NO'} (${res.fuma_cantidad || 0}), Alcohol: ${res.alcohol_frecuencia || 'N/A'}, Act. Física: ${res.actividad_horas || 0}h/sem`
             finalResultado = JSON.stringify({
                 ...extraFieldsToSave,
@@ -206,7 +208,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
         }
 
         // Si es Audiometría
-        if (ex?.prestaciones.nombre.toLowerCase().includes('audiometría')) {
+        if (tipoForm === 'audiometria') {
             const hasHearingLoss = Object.keys(res).some(k => k.startsWith('audio_') && Number(res[k]) > 25)
             const summary = hasHearingLoss ? '⚠️ Requiere eval. especialista' : '✅ Audición Normal'
             finalResultado = JSON.stringify({
@@ -418,7 +420,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                     </div>
 
                                                     <div className="data-entry-area">
-                                                        {ex.prestaciones?.nombre.toLowerCase().includes('signos vitales') ? (
+                                                        {(ex.prestaciones?.tipo_formulario || 'default') === 'signos_vitales' ? (
                                                             <div className="vital-signs-table card glass">
                                                                 <div className="vital-grid">
                                                                     <div className="vital-item">
@@ -468,7 +470,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        ) : ex.prestaciones?.nombre.toLowerCase().includes('test visual') ? (
+                                                        ) : (ex.prestaciones?.tipo_formulario || 'default') === 'test_visual' ? (
                                                             <div className="visual-test-table card glass">
                                                                 <div className="vt-acuity-grid">
                                                                     <div className="vta-row">
@@ -497,7 +499,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        ) : ex.prestaciones?.nombre.toLowerCase().includes('audiometría') ? (
+                                                        ) : (ex.prestaciones?.tipo_formulario || 'default') === 'audiometria' ? (
                                                             <div className="audiovestibular-table card glass">
                                                                 <div className="audio-grid">
                                                                     <div className="audio-header">
@@ -518,7 +520,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                                     ))}
                                                                 </div>
                                                             </div>
-                                                        ) : (ex.prestaciones?.nombre.toLowerCase().includes('estilo de vida') || ex.prestaciones?.nombre.toLowerCase().includes('declaración de salud')) ? (
+                                                        ) : (ex.prestaciones?.tipo_formulario || 'default') === 'estilo_vida' ? (
                                                             <div className="lifestyle-table card glass">
                                                                 <div className="ls-grid">
                                                                     <div className="ls-item group-horizontal">

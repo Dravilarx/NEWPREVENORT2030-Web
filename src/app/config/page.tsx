@@ -33,6 +33,25 @@ interface Prestacion {
     categoria: string;
     costo: number;
     descripcion?: string;
+    tipo_formulario?: string;
+}
+
+const TIPOS_FORMULARIO: Record<string, { label: string; icon: string; color: string }> = {
+    default: { label: 'Texto Libre', icon: '📝', color: '#64748b' },
+    signos_vitales: { label: 'Signos Vitales', icon: '🩺', color: '#10b981' },
+    test_visual: { label: 'Test Visual', icon: '👁️', color: '#8b5cf6' },
+    audiometria: { label: 'Audiometría', icon: '🦻', color: '#f59e0b' },
+    estilo_vida: { label: 'Estilo de Vida', icon: '🏃', color: '#06b6d4' },
+    escala_epworth: { label: 'Escala Epworth', icon: '😴', color: '#6366f1' },
+    romberg: { label: 'Prueba Equilibrio', icon: '⚖️', color: '#ec4899' },
+    framingham: { label: 'Riesgo Cardiovascular', icon: '❤️', color: '#ef4444' },
+    ecg: { label: 'Electrocardiograma', icon: '💓', color: '#f43f5e' },
+    psicotecnico: { label: 'Psicotécnico', icon: '🚦', color: '#22c55e' },
+    psicologico: { label: 'Psicológico', icon: '🧠', color: '#a855f7' },
+    laboratorio: { label: 'Laboratorio', icon: '🧪', color: '#0ea5e9' },
+    radiologia: { label: 'Radiología', icon: '🩻', color: '#78716c' },
+    consulta_medica: { label: 'Consulta Médica', icon: '👨‍⚕️', color: '#14b8a6' },
+    consentimiento: { label: 'Consentimiento', icon: '📋', color: '#94a3b8' },
 }
 
 interface Bateria {
@@ -330,7 +349,8 @@ export default function ConfigPage() {
         nombre: '',
         categoria: '',
         costo: 0,
-        descripcion: ''
+        descripcion: '',
+        tipo_formulario: 'default'
     })
 
     const [newBateria, setNewBateria] = useState({
@@ -349,7 +369,8 @@ export default function ConfigPage() {
             nombre: '',
             categoria: '',
             costo: 0,
-            descripcion: ''
+            descripcion: '',
+            tipo_formulario: 'default'
         })
         setEditingPrestacion(null)
     }
@@ -362,7 +383,8 @@ export default function ConfigPage() {
                 nombre: p.nombre,
                 categoria: p.categoria,
                 costo: p.costo,
-                descripcion: p.descripcion || ''
+                descripcion: p.descripcion || '',
+                tipo_formulario: p.tipo_formulario || 'default'
             })
         } else {
             resetPrestacionForm()
@@ -1212,6 +1234,37 @@ export default function ConfigPage() {
                                                 />
                                             </div>
                                             <div className="form-group">
+                                                <label>📋 Tipo de Formulario</label>
+                                                <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: '-0.3rem 0 0.5rem', lineHeight: 1.3 }}>Define qué formulario especializado se mostrará al profesional durante la evaluación del paciente.</p>
+                                                <select
+                                                    value={newPrestacion.tipo_formulario}
+                                                    onChange={e => setNewPrestacion({ ...newPrestacion, tipo_formulario: e.target.value })}
+                                                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.8rem', color: 'white' }}
+                                                >
+                                                    {Object.entries(TIPOS_FORMULARIO).map(([key, { label, icon }]) => (
+                                                        <option key={key} value={key}>{icon} {label}</option>
+                                                    ))}
+                                                </select>
+                                                {newPrestacion.tipo_formulario && newPrestacion.tipo_formulario !== 'default' && (
+                                                    <div style={{
+                                                        marginTop: '0.5rem',
+                                                        padding: '0.6rem 0.8rem',
+                                                        borderRadius: '10px',
+                                                        background: `${TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.color || '#64748b'}15`,
+                                                        border: `1px solid ${TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.color || '#64748b'}30`,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem',
+                                                        fontSize: '0.8rem'
+                                                    }}>
+                                                        <span style={{ fontSize: '1.1rem' }}>{TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.icon}</span>
+                                                        <span style={{ color: TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.color, fontWeight: 700 }}>
+                                                            {TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.label}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="form-group">
                                                 <label>Descripción</label>
                                                 <textarea
                                                     placeholder="Detalles adicionales..."
@@ -1378,12 +1431,13 @@ export default function ConfigPage() {
                                                 <th className="wl-th-sortable" style={{ textAlign: 'right' }} onClick={() => toggleSort('costo')}>
                                                     Costo {wlSortCol === 'costo' && (wlSortDir === 'asc' ? '▲' : '▼')}
                                                 </th>
+                                                <th>Formulario</th>
                                                 <th>Gestión</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {filteredPrestaciones.length === 0 ? (
-                                                <tr><td colSpan={5} className="wl-empty">No se encontraron exámenes con los filtros aplicados.</td></tr>
+                                                <tr><td colSpan={6} className="wl-empty">No se encontraron exámenes con los filtros aplicados.</td></tr>
                                             ) : filteredPrestaciones.map(p => (
                                                 <tr key={p.id} className="wl-row" onClick={() => openPrestacionPanel(p)}>
                                                     <td><span className="wl-code">{p.codigo}</span></td>
@@ -1395,6 +1449,23 @@ export default function ConfigPage() {
                                                     </td>
                                                     <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>
                                                         ${Number(p.costo).toLocaleString()}
+                                                    </td>
+                                                    <td>
+                                                        <span style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.3rem',
+                                                            padding: '0.25rem 0.6rem',
+                                                            borderRadius: '8px',
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700,
+                                                            background: `${TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.color || '#64748b'}18`,
+                                                            color: TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.color || '#64748b',
+                                                            border: `1px solid ${TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.color || '#64748b'}30`,
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            {TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.icon} {TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.label || p.tipo_formulario}
+                                                        </span>
                                                     </td>
                                                     <td>
                                                         <div className="wl-actions" style={{ justifyContent: 'flex-end' }}>
