@@ -21,7 +21,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
                 }
                 .main-content {
                     flex: 1;
-                    margin-left: 260px;
+                    margin-left: 280px;
                     padding: 2rem;
                     background-color: var(--bg-app);
                     transition: margin 0.3s;

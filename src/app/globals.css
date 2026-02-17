@@ -6,7 +6,9 @@
   --brand-primary-hover: #FF8533;
   --brand-primary-light: rgba(255, 102, 0, 0.1);
   --brand-secondary: #0F172A;
-  /* Deep Navy/Black for sidebar in light mode */
+
+  --bg-app-rgb: 248, 250, 252;
+  --bg-card-rgb: 255, 255, 255;
 
   /* Neutral Palette - Light Mode */
   --bg-app: #F8FAFC;
@@ -43,6 +45,8 @@
 
 [data-theme='dark'] {
   --bg-app: #050505;
+  --bg-app-rgb: 5, 5, 5;
+  --bg-card-rgb: 10, 10, 10;
   --bg-surface: #0A0A0A;
   --bg-card: #111111;
   --bg-input: #1A1A1A;
@@ -193,4 +197,125 @@ h4,
 
 .animate-fade {
   animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* 🏁 SIDEBAR PREMIUM STYLES - REFINED */
+.sidebar {
+  width: 280px;
+  height: 100vh;
+  background: #000 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  padding: 2.5rem 1.8rem;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+}
+
+.sidebar-brand {
+  padding: 0 0 3.5rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-logo {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.05em;
+  font-family: 'Outfit', sans-serif;
+}
+
+.brand-tag {
+  font-size: 0.72rem;
+  color: #ff6600;
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  margin-top: -2px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.95rem 1.4rem;
+  border-radius: 100px;
+  /* Estilo píldora */
+  color: rgba(255, 255, 255, 0.8) !important;
+  text-decoration: none !important;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 700 !important;
+  /* Más negrita */
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+/* HOVER: RELLENO NARANJA (EFECTO BOTÓN) */
+.nav-btn:hover {
+  background: #ff6600 !important;
+  border-color: #ff6600 !important;
+  color: #fff !important;
+  transform: translateX(6px);
+  box-shadow: 0 5px 15px rgba(255, 102, 0, 0.3);
+}
+
+/* ACTIVO: BORDE NARANJA (INDICADOR DE UBICACIÓN) */
+.nav-btn.active {
+  border-color: #ff6600 !important;
+  color: #fff !important;
+  border-width: 1.5px;
+  background: transparent !important;
+}
+
+/* Si pasas el mouse por el activo, también se llena */
+.nav-btn.active:hover {
+  background: #ff6600 !important;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.theme-toggle {
+  width: 100%;
+  padding: 0.85rem;
+  border-radius: 100px;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.theme-toggle:hover {
+  border-color: #fff;
+  background: #111;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 2px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 102, 0, 0.2);
 }

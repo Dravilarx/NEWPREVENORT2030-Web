@@ -2,13 +2,15 @@
 
 import { useState, useEffect, use } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { evaluarParametrosClinicos } from '@/lib/skills/evaluadorClinico'
 import { formatearRUT } from '@/lib/skills/formateadorRUT'
 
 export default function EvaluacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const stationParam = searchParams.get('station')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
@@ -19,11 +21,25 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
 
     // Form values for exams (id_examen -> { resultado, documento_url, observaciones })
     const [resultados, setResultados] = useState<Record<string, any>>({})
-    const [currentRol, setCurrentRol] = useState<string>('Médico') // Simulador de rol
+    const [currentRol, setCurrentRol] = useState<string>('Clínico') // Estación inicial sugerida
+
+    const estaciones = [
+        { id: 'Clínico', nombre: 'Clínico (TENS)', icon: '🩺' },
+        { id: 'Audiometría', nombre: 'Audiometría', icon: '🦻' },
+        { id: 'Psicotécnico', nombre: 'Psicotécnico (TENS)', icon: '🚦' },
+        { id: 'Psicológico', nombre: 'Psicológico (Psicólogo)', icon: '🧠' },
+        { id: 'Radiología', nombre: 'Radiología (Tec. Médico)', icon: '🩻' },
+        { id: 'Laboratorio', nombre: 'Laboratorio (Automático)', icon: '🧪' },
+        { id: 'Médico', nombre: 'Médico (Médico)', icon: '👨‍⚕️' },
+        { id: 'Admin', nombre: 'Administración', icon: '🏢' },
+    ]
 
     useEffect(() => {
+        if (stationParam) {
+            setCurrentRol(stationParam)
+        }
         fetchData()
-    }, [id])
+    }, [id, stationParam])
 
     async function fetchData() {
         setLoading(true)
@@ -47,8 +63,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                 let extraFields: any = {}
 
                 // Si es Signos Vitales o Test Visual, intentamos parsear JSON
-                const exNombre = ex.prestaciones.nombre.toLowerCase()
-                if ((exNombre.includes('signos vitales') || exNombre.includes('test visual')) && ex.resultado?.startsWith('{')) {
+                if (ex.resultado?.startsWith('{')) {
                     try {
                         extraFields = JSON.parse(ex.resultado)
                         parsedResultado = extraFields.resultado // El resumen human-readable
@@ -157,10 +172,17 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
 
         // Si es Signos Vitales, recalculamos el summary y preparamos JSON
         if (ex?.prestaciones.nombre.toLowerCase().includes('signos vitales')) {
+            const valP1 = Number(res.p1) || 0
+            const valP2 = Number(res.p2) || 0
+            const valP3 = Number(res.p3) || 0
+            const ruffier = (res.p1 && res.p2 && res.p3) ? ((valP1 + valP2 + valP3 - 200) / 10).toFixed(1) : '--'
             const imc = (res.peso && res.talla) ? (Number(res.peso) / (Number(res.talla) * Number(res.talla))).toFixed(1) : '--'
-            const summary = `PA: ${res.pa_sistolica}/${res.pa_diastolica}, Pulso: ${res.pulso}, IMC: ${imc}, Sat: ${res.saturometria}%`
+
+            const summary = `PA: ${res.pa_sistolica}/${res.pa_diastolica}, Pulso: ${res.pulso}, IMC: ${imc}, Ruffier: ${ruffier}, Sat: ${res.saturometria}%`
             finalResultado = JSON.stringify({
                 ...extraFieldsToSave,
+                imc,
+                ruffier,
                 resultado: summary
             })
         }
@@ -177,6 +199,16 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
         // Si es Estilo de Vida
         if (ex?.prestaciones.nombre.toLowerCase().includes('estilo de vida')) {
             const summary = `Fuma: ${res.fuma || 'NO'} (${res.fuma_cantidad || 0}), Alcohol: ${res.alcohol_frecuencia || 'N/A'}, Act. Física: ${res.actividad_horas || 0}h/sem`
+            finalResultado = JSON.stringify({
+                ...extraFieldsToSave,
+                resultado: summary
+            })
+        }
+
+        // Si es Audiometría
+        if (ex?.prestaciones.nombre.toLowerCase().includes('audiometría')) {
+            const hasHearingLoss = Object.keys(res).some(k => k.startsWith('audio_') && Number(res[k]) > 25)
+            const summary = hasHearingLoss ? '⚠️ Requiere eval. especialista' : '✅ Audición Normal'
             finalResultado = JSON.stringify({
                 ...extraFieldsToSave,
                 resultado: summary
@@ -259,350 +291,265 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
 
             <div className="evaluation-layout">
                 <div className="exams-column">
-                    <div className="role-selector card glass">
-                        <label>Estación de Trabajo:</label>
-                        <select value={currentRol} onChange={(e) => setCurrentRol(e.target.value)}>
-                            <option value="Paramédico">Paramédico / Laboratorio</option>
-                            <option value="Psicólogo">Psicología</option>
-                            <option value="Médico">Médico Examinador</option>
-                        </select>
+                    <div className="station-selector-grid">
+                        {estaciones.map(est => {
+                            const examsInStation = examenes.filter(ex => ex.rol_asignado === est.id)
+                            const completedInStation = examsInStation.filter(ex => ex.estado === 'finalizado').length
+                            const totalInStation = examsInStation.length
+                            const isDone = totalInStation > 0 && completedInStation === totalInStation
+
+                            return (
+                                <button
+                                    key={est.id}
+                                    className={`station-card ${currentRol === est.id ? 'active' : ''} ${isDone ? 'done' : ''}`}
+                                    onClick={() => setCurrentRol(est.id)}
+                                >
+                                    <span className="st-icon">{est.icon}</span>
+                                    <div className="st-info">
+                                        <div className="st-name-row">
+                                            <span className="st-name">{est.nombre}</span>
+                                            {isDone && <span className="st-check">✅</span>}
+                                        </div>
+                                        <span className="st-status">
+                                            {completedInStation}/{totalInStation} LISTO
+                                        </span>
+                                    </div>
+                                    <div className="st-progress">
+                                        <div className="st-progress-bar" style={{ width: totalInStation > 0 ? `${(completedInStation / totalInStation) * 100}%` : '0%' }}></div>
+                                    </div>
+                                </button>
+                            )
+                        })}
                     </div>
 
-                    {Object.entries(examenesPorGrupo).map(([grupo, items]: [string, any]) => (
-                        <section key={grupo} className="group-section card glass">
-                            <h3 className="group-title">{grupo}</h3>
-                            <div className="exams-list">
-                                {items.map((ex: any) => {
-                                    const isEditable = ex.rol_asignado === currentRol
-                                    const res = resultados[ex.id] || {}
-                                    const isAnalizando = analizando[ex.id]
+                    {totalCount === 0 ? (
+                        <div className="empty-state card glass">
+                            <span className="empty-icon">📂</span>
+                            <h3>No hay prestaciones asignadas</h3>
+                            <p>Esta evaluación no registra exámenes pendientes en la base de datos.</p>
+                        </div>
+                    ) : Object.entries(examenesPorGrupo).map(([grupo, items]: [string, any]) => {
+                        const filteredItems = currentRol === 'Médico' || currentRol === 'Admin'
+                            ? items
+                            : items.filter((ex: any) => {
+                                if (currentRol === 'Clínico' && (ex.rol_asignado === 'Clínico' || ex.rol_asignado === 'Paramédico')) return true
+                                if (currentRol === 'Audiometría' && (ex.rol_asignado === 'Fonoaudiólogo' || ex.prestaciones?.nombre?.toLowerCase().includes('audio'))) return true
+                                if (currentRol === 'Radiología' && ex.rol_asignado === 'Tecnólogo') return true
+                                if (currentRol === 'Psicotécnico' && ex.rol_asignado === 'Psicotécnico') return true
+                                return ex.rol_asignado === currentRol
+                            })
 
-                                    return (
-                                        <div key={ex.id} className={`exam-row ${ex.estado === 'finalizado' ? 'row-finalizado' : ''}`}>
-                                            <div className="exam-info-header">
-                                                <div className="name-box">
-                                                    <label>{ex.prestaciones.nombre}</label>
-                                                    <span className="rol-tag">{ex.rol_asignado}</span>
-                                                </div>
-                                                <div className="status-tag-mini">
-                                                    {ex.estado === 'finalizado' ? '✅ COMPLETO' : '⏳ PENDIENTE'}
-                                                </div>
-                                            </div>
+                        if (filteredItems.length === 0) return null
 
-                                            <div className="exam-grid-container">
-                                                <div className="dropzone-area">
-                                                    {res.documento_url ? (
-                                                        <div className="file-preview">
-                                                            <div className="file-info-row">
-                                                                <span className="file-icon">📄</span>
-                                                                <span className="file-name">Documento_Escaneado.pdf</span>
-                                                            </div>
-                                                            <div className="file-actions">
-                                                                <a href={res.documento_url} target="_blank" className="btn-view">Ver Archivo</a>
-                                                                {isEditable && <button className="btn-reset" onClick={() => updateExamField(ex.id, 'documento_url', '')}>Cambiar</button>}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div
-                                                            className={`dropzone ${isAnalizando ? 'analizando' : ''}`}
-                                                            onDragOver={(e) => e.preventDefault()}
-                                                            onDrop={(e) => { e.preventDefault(); handleFileDrop(ex.id, e.dataTransfer.files) }}
-                                                            onClick={() => isEditable && document.getElementById(`file-${ex.id}`)?.click()}
-                                                        >
-                                                            {isAnalizando ? (
-                                                                <div className="ai-analysing">
-                                                                    <div className="scanner-line"></div>
-                                                                    <span>Analizando Imagen con IA...</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="dz-content">
-                                                                    <span className="icon">📄</span>
-                                                                    <p>Arrastrar o <strong>Click</strong> para subir</p>
-                                                                    <span className="formats">PDF, JPG, PNG</span>
-                                                                    <input
-                                                                        type="file"
-                                                                        id={`file-${ex.id}`}
-                                                                        hidden
-                                                                        onChange={(e) => e.target.files && handleFileDrop(ex.id, e.target.files)}
-                                                                        disabled={!isEditable}
-                                                                        accept="image/*,application/pdf"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
+                        return (
+                            <section key={grupo} className="group-section card glass">
+                                <div className="group-header-flex">
+                                    <h3 className="group-title">{grupo}</h3>
+                                    {currentRol === 'Laboratorio' && (
+                                        <button
+                                            className="btn-auto-fill"
+                                            onClick={() => alert("Simulando conexión con Sistema de Laboratorio (LIS)...")}
+                                        >
+                                            🚀 Importar Resultados LIS
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="exams-list">
+                                    {filteredItems.map((ex: any) => {
+                                        const isEditable = (ex.rol_asignado === currentRol) ||
+                                            (currentRol === 'Clínico' && ex.rol_asignado === 'Paramédico') ||
+                                            (currentRol === 'Médico')
+
+                                        const res = resultados[ex.id] || {}
+                                        const isAnalizando = analizando[ex.id]
+
+                                        return (
+                                            <div key={ex.id} className={`exam-row ${ex.estado === 'finalizado' ? 'row-finalizado' : ''}`}>
+                                                <div className="exam-info-header">
+                                                    <div className="name-box">
+                                                        <label>{ex.prestaciones.nombre}</label>
+                                                        <span className="rol-tag">{ex.rol_asignado}</span>
+                                                    </div>
+                                                    <div className="status-tag-mini">
+                                                        {ex.estado === 'finalizado' ? '✅ COMPLETO' : '⏳ PENDIENTE'}
+                                                    </div>
                                                 </div>
 
-                                                <div className="data-entry-area">
-                                                    {ex.prestaciones.nombre.toLowerCase().includes('signos vitales') ? (
-                                                        <div className="vital-signs-table card glass">
-                                                            <div className="vital-grid">
-                                                                <div className="vital-item">
-                                                                    <label>Pulso</label>
-                                                                    <input type="number" value={res.pulso || ''} onChange={(e) => updateExamField(ex.id, 'pulso', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                <div className="exam-grid-container">
+                                                    <div className="dropzone-area">
+                                                        {res.documento_url ? (
+                                                            <div className="file-preview">
+                                                                <div className="file-info-row">
+                                                                    <span className="file-icon">📄</span>
+                                                                    <span className="file-name">Documento Escaneado</span>
                                                                 </div>
-                                                                <div className="vital-item pa-group">
-                                                                    <label>P.A (Sis/Dia)</label>
-                                                                    <div className="flex-pa">
-                                                                        <input type="number" placeholder="Sis" value={res.pa_sistolica || ''} onChange={(e) => updateExamField(ex.id, 'pa_sistolica', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        <span>/</span>
-                                                                        <input type="number" placeholder="Dia" value={res.pa_diastolica || ''} onChange={(e) => updateExamField(ex.id, 'pa_diastolica', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                <div className="file-actions">
+                                                                    <a href={res.documento_url} target="_blank" className="btn-view">Ver Archivo</a>
+                                                                    {isEditable && <button className="btn-reset" onClick={() => updateExamField(ex.id, 'documento_url', '')}>Cambiar</button>}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                className={`dropzone ${isAnalizando ? 'analizando' : ''}`}
+                                                                onDragOver={(e) => e.preventDefault()}
+                                                                onDrop={(e) => { e.preventDefault(); handleFileDrop(ex.id, e.dataTransfer.files) }}
+                                                                onClick={() => isEditable && document.getElementById(`file-${ex.id}`)?.click()}
+                                                            >
+                                                                {isAnalizando ? (
+                                                                    <div className="ai-analysing">
+                                                                        <div className="scanner-line"></div>
+                                                                        <span>Analizando...</span>
                                                                     </div>
-                                                                </div>
-                                                                <div className="vital-item">
-                                                                    <label>Peso (kg)</label>
-                                                                    <input type="number" value={res.peso || ''} onChange={(e) => updateExamField(ex.id, 'peso', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                </div>
-                                                                <div className="vital-item">
-                                                                    <label>Talla (m)</label>
-                                                                    <input type="number" step="0.01" value={res.talla || ''} onChange={(e) => updateExamField(ex.id, 'talla', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                </div>
-                                                                <div className="vital-item">
-                                                                    <label>Cintura</label>
-                                                                    <input type="number" value={res.cintura || ''} onChange={(e) => updateExamField(ex.id, 'cintura', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                </div>
-                                                                <div className="vital-item">
-                                                                    <label>Sat %</label>
-                                                                    <input type="number" value={res.saturometria || ''} onChange={(e) => updateExamField(ex.id, 'saturometria', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                </div>
-                                                                <div className="vital-item highlight">
-                                                                    <label>IMC</label>
-                                                                    <div className="calc-val">
-                                                                        {(res.peso && res.talla) ? (Number(res.peso) / (Number(res.talla) * Number(res.talla))).toFixed(1) : '--'}
+                                                                ) : (
+                                                                    <div className="dz-content">
+                                                                        <span className="icon">📄</span>
+                                                                        <p>Arrastrar o <strong>Click</strong> para subir</p>
+                                                                        <input
+                                                                            type="file"
+                                                                            id={`file-${ex.id}`}
+                                                                            hidden
+                                                                            onChange={(e) => e.target.files && handleFileDrop(ex.id, e.target.files)}
+                                                                            disabled={!isEditable}
+                                                                        />
                                                                     </div>
-                                                                </div>
-                                                                <div className="vital-item">
-                                                                    <label>Pulso Post</label>
-                                                                    <input type="number" value={res.pulso_post || ''} onChange={(e) => updateExamField(ex.id, 'pulso_post', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                </div>
-                                                                <div className="vital-item">
-                                                                    <label>Pulso Recup</label>
-                                                                    <input type="number" value={res.pulso_recuperacion || ''} onChange={(e) => updateExamField(ex.id, 'pulso_recuperacion', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                </div>
-                                                                <div className="vital-item highlight">
-                                                                    <label>Test Ruffier</label>
-                                                                    <div className="calc-val">
-                                                                        {(res.pulso && res.pulso_post && res.pulso_recuperacion) ?
-                                                                            ((Number(res.pulso) + Number(res.pulso_post) + Number(res.pulso_recuperacion) - 200) / 10).toFixed(1) : '--'}
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="data-entry-area">
+                                                        {ex.prestaciones?.nombre.toLowerCase().includes('signos vitales') ? (
+                                                            <div className="vital-signs-table card glass">
+                                                                <div className="vital-grid">
+                                                                    <div className="vital-item">
+                                                                        <label>Pulso</label>
+                                                                        <input type="number" value={res.pulso || ''} onChange={(e) => updateExamField(ex.id, 'pulso', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vital-item pa-group">
+                                                                        <label>P.A (Sis/Dia)</label>
+                                                                        <div className="flex-pa">
+                                                                            <input type="number" placeholder="Sis" value={res.pa_sistolica || ''} onChange={(e) => updateExamField(ex.id, 'pa_sistolica', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                            <span>/</span>
+                                                                            <input type="number" placeholder="Dia" value={res.pa_diastolica || ''} onChange={(e) => updateExamField(ex.id, 'pa_diastolica', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="vital-item">
+                                                                        <label>Peso (kg)</label>
+                                                                        <input type="number" value={res.peso || ''} onChange={(e) => updateExamField(ex.id, 'peso', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vital-item">
+                                                                        <label>Talla (m)</label>
+                                                                        <input type="number" step="0.01" value={res.talla || ''} onChange={(e) => updateExamField(ex.id, 'talla', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vital-item highlight">
+                                                                        <label>IMC</label>
+                                                                        <div className="calc-val">
+                                                                            {(res.peso && res.talla) ? (Number(res.peso) / (Number(res.talla) * Number(res.talla))).toFixed(1) : '--'}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="vital-item">
+                                                                        <label>Sat %</label>
+                                                                        <input type="number" value={res.saturometria || ''} onChange={(e) => updateExamField(ex.id, 'saturometria', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vital-item">
+                                                                        <label>Test Ruffier (C.)</label>
+                                                                        <div className="flex-pa">
+                                                                            <input type="number" placeholder="P1" value={res.pulso || ''} disabled />
+                                                                            <input type="number" placeholder="P2" value={res.pulso_post || ''} onChange={(e) => updateExamField(ex.id, 'pulso_post', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                            <input type="number" placeholder="P3" value={res.pulso_recuperacion || ''} onChange={(e) => updateExamField(ex.id, 'pulso_recuperacion', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="vital-item highlight">
+                                                                        <label>Resultado Ruffier</label>
+                                                                        <div className="calc-val">
+                                                                            {(res.pulso && res.pulso_post && res.pulso_recuperacion) ?
+                                                                                ((Number(res.pulso) + Number(res.pulso_post) + Number(res.pulso_recuperacion) - 200) / 10).toFixed(1) : '--'}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    ) : ex.prestaciones.nombre.toLowerCase().includes('test visual') ? (
-                                                        <div className="visual-test-table card glass">
-                                                            <div className="vt-section">
-                                                                <label className="vt-title">I. Uso de Lentes</label>
-                                                                <div className="vt-lentes-grid">
-                                                                    {['No usa', 'Visión Lejos', 'Visión Cerca', 'Bifocales', 'Monocular OD', 'Monocular OI', 'Contacto'].map(opt => (
-                                                                        <label key={opt} className="vt-check">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={res.lentes === opt}
-                                                                                onChange={() => updateExamField(ex.id, 'lentes', opt)}
-                                                                                disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                            />
-                                                                            <span>{opt}</span>
-                                                                        </label>
+                                                        ) : ex.prestaciones?.nombre.toLowerCase().includes('test visual') ? (
+                                                            <div className="visual-test-table card glass">
+                                                                <div className="vt-acuity-grid">
+                                                                    <div className="vta-row">
+                                                                        <span className="vta-label">Lejos OD</span>
+                                                                        <input type="text" value={res.lejos_od || ''} onChange={(e) => updateExamField(ex.id, 'lejos_od', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vta-row">
+                                                                        <span className="vta-label">Lejos OI</span>
+                                                                        <input type="text" value={res.lejos_oi || ''} onChange={(e) => updateExamField(ex.id, 'lejos_oi', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vta-row">
+                                                                        <span className="vta-label">Lejos Ambos</span>
+                                                                        <input type="text" value={res.lejos_ambos || ''} onChange={(e) => updateExamField(ex.id, 'lejos_ambos', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vta-row">
+                                                                        <span className="vta-label">Cerca OD</span>
+                                                                        <input type="text" value={res.cerca_od || ''} onChange={(e) => updateExamField(ex.id, 'cerca_od', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vta-row">
+                                                                        <span className="vta-label">Cerca OI</span>
+                                                                        <input type="text" value={res.cerca_oi || ''} onChange={(e) => updateExamField(ex.id, 'cerca_oi', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                    <div className="vta-row">
+                                                                        <span className="vta-label">Cerca Ambos</span>
+                                                                        <input type="text" value={res.cerca_ambos || ''} onChange={(e) => updateExamField(ex.id, 'cerca_ambos', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ) : ex.prestaciones?.nombre.toLowerCase().includes('audiometría') ? (
+                                                            <div className="audiovestibular-table card glass">
+                                                                <div className="audio-grid">
+                                                                    <div className="audio-header">
+                                                                        <span>Hz</span><span>OD</span><span>OI</span>
+                                                                    </div>
+                                                                    {[500, 1000, 2000, 3000, 4000, 6000, 8000].map(freq => (
+                                                                        <div key={freq} className="audio-row">
+                                                                            <span className="freq-label">{freq}</span>
+                                                                            <select value={res[`audio_od_${freq}`] || ''} onChange={(e) => updateExamField(ex.id, `audio_od_${freq}`, e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'}>
+                                                                                <option value="">--</option>
+                                                                                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80].map(db => <option key={db} value={db}>{db}</option>)}
+                                                                            </select>
+                                                                            <select value={res[`audio_oi_${freq}`] || ''} onChange={(e) => updateExamField(ex.id, `audio_oi_${freq}`, e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'}>
+                                                                                <option value="">--</option>
+                                                                                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80].map(db => <option key={db} value={db}>{db}</option>)}
+                                                                            </select>
+                                                                        </div>
                                                                     ))}
                                                                 </div>
                                                             </div>
-
-                                                            <div className="vt-section mt">
-                                                                <label className="vt-title">II. Agudeza Visual</label>
-                                                                <div className="vt-acuity-grid">
-                                                                    <div className="vta-header">
-                                                                        <span>Tipo</span><span>OD</span><span>OI</span><span>Ambos</span><span>Foria</span>
-                                                                    </div>
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Lejos</span>
-                                                                        <input type="text" placeholder="OD" value={res.lejos_od || ''} onChange={(e) => updateExamField(ex.id, 'lejos_od', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        <input type="text" placeholder="OI" value={res.lejos_oi || ''} onChange={(e) => updateExamField(ex.id, 'lejos_oi', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        <input type="text" placeholder="Ambos" value={res.lejos_ambos || ''} onChange={(e) => updateExamField(ex.id, 'lejos_ambos', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        <input type="text" placeholder="Foria" value={res.lejos_foria || ''} onChange={(e) => updateExamField(ex.id, 'lejos_foria', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                    <div className="vta-row">
-                                                                        <span className="vta-label">Cerca</span>
-                                                                        <input type="text" placeholder="OD" value={res.cerca_od || ''} onChange={(e) => updateExamField(ex.id, 'cerca_od', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        <input type="text" placeholder="OI" value={res.cerca_oi || ''} onChange={(e) => updateExamField(ex.id, 'cerca_oi', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        <input type="text" placeholder="Ambos" value={res.cerca_ambos || ''} onChange={(e) => updateExamField(ex.id, 'cerca_ambos', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                        <input type="text" placeholder="Foria" value={res.cerca_foria || ''} onChange={(e) => updateExamField(ex.id, 'cerca_foria', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="vt-section mt">
-                                                                <label className="vt-title">III. Profundidad & Flechas</label>
-                                                                <div className="vt-misc-grid">
-                                                                    <div className="vt-misc-item">
-                                                                        <label>Mariposa</label>
-                                                                        <div className="flex-si-no">
-                                                                            <button className={res.mariposa === 'SI' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'mariposa', 'SI')} disabled={!isEditable && ex.estado === 'finalizado'}>SI</button>
-                                                                            <button className={res.mariposa === 'NO' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'mariposa', 'NO')} disabled={!isEditable && ex.estado === 'finalizado'}>NO</button>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="vt-misc-item flechas-block">
-                                                                        <label>Flechas</label>
-                                                                        <div className="number-line">
-                                                                            <div className="number-line-track">
-                                                                                <div className="number-line-fill" style={{ width: res.flechas ? `${((Number(res.flechas) - 1) / 8) * 100}%` : '0%' }}></div>
-                                                                            </div>
-                                                                            <div className="number-line-points">
-                                                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                                                                                    <button
-                                                                                        key={n}
-                                                                                        className={`nl-point ${Number(res.flechas) === n ? 'selected' : ''} ${Number(res.flechas) >= n ? 'filled' : ''}`}
-                                                                                        onClick={() => updateExamField(ex.id, 'flechas', String(n))}
-                                                                                        disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                                    >
-                                                                                        <span className="nl-dot"></span>
-                                                                                        <span className="nl-label">{n}</span>
-                                                                                    </button>
-                                                                                ))}
+                                                        ) : (ex.prestaciones?.nombre.toLowerCase().includes('estilo de vida') || ex.prestaciones?.nombre.toLowerCase().includes('declaración de salud')) ? (
+                                                            <div className="lifestyle-table card glass">
+                                                                <div className="ls-grid">
+                                                                    <div className="ls-item group-horizontal">
+                                                                        <div className="ls-field">
+                                                                            <label>¿Fuma?</label>
+                                                                            <div className="flex-si-no">
+                                                                                <button className={res.fuma === 'SI' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'fuma', 'SI')} disabled={!isEditable && ex.estado === 'finalizado'}>SI</button>
+                                                                                <button className={res.fuma === 'NO' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'fuma', 'NO')} disabled={!isEditable && ex.estado === 'finalizado'}>NO</button>
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="vt-section mt">
-                                                                <label className="vt-title">IV. Animales & Colores</label>
-                                                                <div className="vt-animal-color-flex">
-                                                                    <div className="vt-animales-box">
-                                                                        <label>Animales (A-C / 1-5)</label>
-                                                                        <div className="vt-color-table">
-                                                                            <div className="vt-color-header animal-header">
-                                                                                <span>#</span>
-                                                                                {[1, 2, 3, 4, 5].map(n => <span key={n}>{n}</span>)}
-                                                                            </div>
-                                                                            {['A', 'B', 'C'].map(row => (
-                                                                                <div key={row} className="vt-color-row animal-row">
-                                                                                    <span className="row-num">{row}</span>
-                                                                                    {[1, 2, 3, 4, 5].map(col => (
-                                                                                        <div key={col} className="check-cell">
-                                                                                            <input
-                                                                                                type="checkbox"
-                                                                                                checked={res[`animal_${row}${col}`] === 'true'}
-                                                                                                onChange={(e) => updateExamField(ex.id, `animal_${row}${col}`, e.target.checked ? 'true' : 'false')}
-                                                                                                disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                                            />
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="vt-colores-box">
-                                                                        <label>Discriminación de Colores</label>
-                                                                        <div className="vt-color-table">
-                                                                            <div className="vt-color-header">
-                                                                                <span>#</span>
-                                                                                <span>SI</span>
-                                                                                <span>NO</span>
-                                                                            </div>
-                                                                            {[1, 2, 3, 4, 5].map(n => (
-                                                                                <div key={n} className="vt-color-row">
-                                                                                    <span className="row-num">{n}</span>
-                                                                                    <div className="check-cell">
-                                                                                        <input
-                                                                                            type="checkbox"
-                                                                                            checked={res[`color_${n}_si`] === 'true'}
-                                                                                            onChange={(e) => updateExamField(ex.id, `color_${n}_si`, e.target.checked ? 'true' : 'false')}
-                                                                                            disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className="check-cell">
-                                                                                        <input
-                                                                                            type="checkbox"
-                                                                                            checked={res[`color_${n}_no`] === 'true'}
-                                                                                            onChange={(e) => updateExamField(ex.id, `color_${n}_no`, e.target.checked ? 'true' : 'false')}
-                                                                                            disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                                        />
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
+                                                                    <div className="ls-item">
+                                                                        <label>Actividad Física (hrs/sem)</label>
+                                                                        <input type="number" value={res.actividad_horas || ''} onChange={(e) => updateExamField(ex.id, 'actividad_horas', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    ) : ex.prestaciones.nombre.toLowerCase().includes('estilo de vida') ? (
-                                                        <div className="lifestyle-table card glass">
-                                                            <div className="ls-grid">
-                                                                <div className="ls-item group-horizontal">
-                                                                    <div className="ls-field">
-                                                                        <label>¿Fuma?</label>
-                                                                        <div className="flex-si-no">
-                                                                            <button className={res.fuma === 'SI' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'fuma', 'SI')} disabled={!isEditable && ex.estado === 'finalizado'}>SI</button>
-                                                                            <button className={res.fuma === 'NO' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'fuma', 'NO')} disabled={!isEditable && ex.estado === 'finalizado'}>NO</button>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="ls-field">
-                                                                        <label>Cigarrillos/Día</label>
-                                                                        <input type="number" placeholder="0" value={res.fuma_cantidad || ''} onChange={(e) => updateExamField(ex.id, 'fuma_cantidad', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="ls-item">
-                                                                    <label>Consumo Alcohol</label>
-                                                                    <div className="ls-select-group">
-                                                                        {['Nunca', 'Social', 'Semanal', 'Diario'].map(opt => (
-                                                                            <button key={opt} className={res.alcohol_frecuencia === opt ? 'active' : ''} onClick={() => updateExamField(ex.id, 'alcohol_frecuencia', opt)} disabled={!isEditable && ex.estado === 'finalizado'}>{opt}</button>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="ls-item group-horizontal">
-                                                                    <div className="ls-field">
-                                                                        <label>¿Actividad Física?</label>
-                                                                        <div className="flex-si-no">
-                                                                            <button className={res.actividad_fisica === 'SI' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'actividad_fisica', 'SI')} disabled={!isEditable && ex.estado === 'finalizado'}>SI</button>
-                                                                            <button className={res.actividad_fisica === 'NO' ? 'active' : ''} onClick={() => updateExamField(ex.id, 'actividad_fisica', 'NO')} disabled={!isEditable && ex.estado === 'finalizado'}>NO</button>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="ls-field">
-                                                                        <label>Horas/Semana</label>
-                                                                        <input type="number" placeholder="0" value={res.actividad_horas || ''} onChange={(e) => updateExamField(ex.id, 'actividad_horas', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="ls-item">
-                                                                    <label>Calidad de Sueño (Horas)</label>
-                                                                    <input type="number" placeholder="hrs" value={res.sueno_horas || ''} onChange={(e) => updateExamField(ex.id, 'sueno_horas', e.target.value)} disabled={!isEditable && ex.estado === 'finalizado'} />
-                                                                </div>
-
-                                                                <div className="ls-item">
-                                                                    <label>Nivel de Estrés Percibido</label>
-                                                                    <div className="ls-select-group">
-                                                                        {['Bajo', 'Medio', 'Alto'].map(opt => (
-                                                                            <button key={opt} className={res.estres_nivel === opt ? 'active' : ''} onClick={() => updateExamField(ex.id, 'estres_nivel', opt)} disabled={!isEditable && ex.estado === 'finalizado'}>{opt}</button>
-                                                                        ))}
-                                                                    </div>
+                                                        ) : (
+                                                            <div className="default-inputs">
+                                                                <div className="input-group">
+                                                                    <label>Resultado / Hallazgo</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={res.resultado || ''}
+                                                                        onChange={(e) => updateExamField(ex.id, 'resultado', e.target.value)}
+                                                                        disabled={!isEditable && ex.estado === 'finalizado'}
+                                                                    />
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="input-group">
-                                                                <label>Resultado / Hallazgo</label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Ingrese valor manual o detectado..."
-                                                                    value={res.resultado || ''}
-                                                                    onChange={(e) => updateExamField(ex.id, 'resultado', e.target.value)}
-                                                                    disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                />
-                                                            </div>
-                                                            <div className="input-group">
-                                                                <label>Observaciones</label>
-                                                                <textarea
-                                                                    placeholder="..."
-                                                                    value={res.observaciones || ''}
-                                                                    onChange={(e) => updateExamField(ex.id, 'observaciones', e.target.value)}
-                                                                    disabled={!isEditable && ex.estado === 'finalizado'}
-                                                                />
-                                                            </div>
-                                                        </>
-                                                    )}
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 <div className="save-action-area">
@@ -610,37 +557,35 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                         <button
                                                             className="btn-save-row"
                                                             onClick={() => guardarExamen(ex.id)}
-                                                            disabled={!res.resultado && !res.documento_url && !res.pulso && !res.lejos_od && !res.fuma}
+                                                            disabled={!res.resultado && !res.documento_url && !res.pulso && !res.lejos_od && !res.fuma && !res.audio_od_1000}
                                                         >
                                                             Guardar
                                                         </button>
                                                     )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </section>
-                    ))}
+                                        )
+                                    })}
+                                </div>
+                            </section>
+                        )
+                    })}
 
                     <div className="form-actions-footer card glass">
                         <div className="ready-checks">
-                            <h4>Veredicto Final del Médico</h4>
+                            <h4>Veredicto Final</h4>
                             <p className={isComplete ? 'text-success' : 'text-warning'}>
-                                {isComplete ? '✅ Batería de exámenes lista para cierre.' : '⚠ Pendiente completar todos los exámenes.'}
+                                {isComplete ? '✅ Todo listo' : '⚠ Pendiente'}
                             </p>
                         </div>
                         <div className="footer-btns">
-                            <button className="btn btn-secondary" onClick={procesarIA} disabled={!isComplete}>
-                                Analizar con IA 🤖
-                            </button>
+                            <button className="btn btn-secondary" onClick={procesarIA} disabled={!isComplete}>Analizar con IA</button>
                             <button
                                 className="btn btn-primary"
                                 onClick={finalizarAtencionMedica}
                                 disabled={saving || !isComplete || currentRol !== 'Médico'}
                             >
-                                {saving ? 'Cerrando...' : 'Emitir Alta y Cerrar Ficha'}
+                                {saving ? 'Cerrando...' : 'Finalizar y Cerrar Ficha'}
                             </button>
                         </div>
                     </div>
@@ -648,204 +593,339 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
 
                 <div className="ai-status-column">
                     {veredicto ? (
-                        <div className={`ai-veredict-card animate-slide-in ${veredicto.estado_sugerido}`}>
-                            <div className="ai-card-header">
-                                <span className="ai-brain-icon">🧠</span>
-                                <h3>Veredicto IA</h3>
-                            </div>
-                            <div className="veredict-status">
-                                {veredicto.estado_sugerido.toUpperCase().replace('_', ' ')}
-                            </div>
-                            <p className="ai-justification">{veredicto.justificacion}</p>
+                        <div className={`ai-veredict-card ${veredicto.estado_sugerido}`}>
+                            <h3>Veredicto IA</h3>
+                            <div className="veredict-status">{veredicto.estado_sugerido}</div>
+                            <p>{veredicto.justificacion}</p>
                         </div>
                     ) : (
                         <div className="ai-placeholder-card card glass">
-                            <span className="icon">🛡</span>
-                            <p>El asistente IA analizará la aptitud una vez que todos los componentes de la batería hayan sido ingresados por sus respectivos especialistas.</p>
+                            <p>El asistente IA analizará la aptitud al finalizar.</p>
                         </div>
                     )}
                 </div>
-            </div >
+            </div>
 
             <style jsx>{`
-                .evaluacion-detalle { padding: 2rem; max-width: 1400px; margin: 0 auto; color: #fff; }
-                .back-link { background: none; border: none; color: var(--brand-primary); cursor: pointer; font-weight: 800; margin-bottom: 2rem; font-size: 0.9rem; }
-                .header-flex { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 3rem; }
-                h1 { font-size: 3rem; font-weight: 950; margin: 0; letter-spacing: -0.02em; }
-                .subtitle { color: var(--text-muted); margin-top: 0.5rem; font-size: 1.1rem; }
-                
-                .role-selector { padding: 1.5rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1.5rem; }
-                .role-selector label { font-weight: 800; color: var(--brand-primary); text-transform: uppercase; font-size: 0.75rem; }
-                .role-selector select { background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.1); padding: 0.8rem 1.2rem; border-radius: 12px; font-weight: 700; outline: none; }
-
-                .group-section { margin-bottom: 2.5rem; padding: 2rem; border-radius: 24px; }
-                .group-title { margin-bottom: 2rem; font-size: 1.1rem; text-transform: uppercase; font-weight: 900; color: var(--brand-primary); border-bottom: 1px solid rgba(255,107,44,0.1); padding-bottom: 1rem; }
-
-                .exams-list { display: flex; flex-direction: column; gap: 1.5rem; }
-                .exam-row { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 1.5rem; }
-                .row-finalizado { border-left: 5px solid #10b981; }
-
-                .exam-info-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-                .name-box label { font-size: 1.2rem; font-weight: 800; display: block; margin-bottom: 0.3rem; }
-                .rol-tag { font-size: 0.6rem; background: rgba(255,107,44,0.15); color: var(--brand-primary); padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 900; text-transform: uppercase; }
-
-                .exam-grid-container { display: grid; grid-template-columns: 320px 1fr 100px; gap: 2rem; align-items: start; }
-                
-                .dropzone { 
-                    border: 2px dashed rgba(255,255,255,0.1); border-radius: 16px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: 0.3s;
-                    background: rgba(255,255,255,0.01); height: 160px; display: flex; align-items: center; justify-content: center;
+                .evaluacion-detalle { 
+                    padding: 2rem; 
+                    max-width: 1600px; 
+                    margin: 0 auto; 
+                    color: #fff; 
+                    min-height: 100vh;
+                    background: #000;
                 }
+
+                .page-header {
+                    margin-bottom: 3rem;
+                }
+
+                .header-flex {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-end;
+                    gap: 2rem;
+                    border-bottom: 1px solid rgba(255,255,255,0.1);
+                    padding-bottom: 2rem;
+                }
+
+                .status-row {
+                    margin-bottom: 0.5rem;
+                }
+
+                .progress-badge {
+                    background: rgba(255,255,255,0.05);
+                    padding: 0.4rem 1rem;
+                    border-radius: 100px;
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    color: rgba(255,255,255,0.6);
+                    border: 1px solid rgba(255,255,255,0.1);
+                }
+
+                .progress-badge.done {
+                    background: rgba(16, 185, 129, 0.1);
+                    color: #10b981;
+                    border-color: rgba(16, 185, 129, 0.2);
+                }
+
+                h1 { 
+                    font-size: 3rem; 
+                    font-weight: 950; 
+                    margin: 0.5rem 0; 
+                    letter-spacing: -0.04em; 
+                    line-height: 1;
+                    color: var(--brand-primary);
+                }
+
+                .subtitle { 
+                    font-size: 1.1rem; 
+                    opacity: 0.7; 
+                    margin: 0;
+                }
+
+                .cargo-badge {
+                    text-align: right;
+                    background: rgba(255,255,255,0.03);
+                    padding: 1rem 1.5rem;
+                    border-radius: 20px;
+                    border: 1px solid rgba(255,255,255,0.05);
+                }
+
+                .cargo-badge .label {
+                    display: block;
+                    font-size: 0.7rem;
+                    text-transform: uppercase;
+                    font-weight: 800;
+                    opacity: 0.5;
+                    margin-bottom: 0.3rem;
+                }
+
+                .cargo-badge .value {
+                    font-size: 1.2rem;
+                    font-weight: 900;
+                    color: #fff;
+                }
+
+                .evaluation-layout { 
+                    display: grid; 
+                    grid-template-columns: 1fr 380px; 
+                    gap: 3rem; 
+                }
+
+                .station-selector-grid { 
+                    display: grid; 
+                    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+                    gap: 1rem; 
+                    margin-bottom: 3rem; 
+                }
+
+                .station-card {
+                    background: #0a0a0a;
+                    border: 1px solid rgba(255,255,255,0.05);
+                    padding: 1.5rem;
+                    border-radius: 20px;
+                    display: flex;
+                    align-items: center;
+                    gap: 1.2rem;
+                    cursor: pointer;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    text-align: left;
+                    position: relative;
+                    overflow: hidden;
+                    width: 100%;
+                }
+
+                .station-card:hover {
+                    background: #111;
+                    border-color: rgba(255,107,44,0.3);
+                    transform: translateY(-2px);
+                }
+
+                .station-card.active {
+                    background: rgba(255,107,44,0.1);
+                    border-color: var(--brand-primary);
+                    box-shadow: 0 10px 30px rgba(255,107,44,0.15);
+                }
+
+                .st-icon {
+                    font-size: 1.8rem;
+                    filter: drop-shadow(0 0 10px rgba(255,255,255,0.1));
+                }
+
+                .st-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.2rem;
+                }
+
+                .st-name {
+                    font-size: 0.9rem;
+                    font-weight: 800;
+                    color: #fff;
+                }
+
+                .st-status {
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    opacity: 0.4;
+                    text-transform: uppercase;
+                }
+
+                .st-progress {
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 4px;
+                    background: rgba(255,255,255,0.05);
+                }
+
+                .st-progress-bar {
+                    height: 100%;
+                    background: var(--brand-primary);
+                    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+
+                .group-section {
+                    margin-bottom: 2rem;
+                    padding: 2rem;
+                    border-radius: 32px;
+                }
+
+                .group-title {
+                    font-size: 1.4rem;
+                    font-weight: 900;
+                    margin-bottom: 2rem;
+                    letter-spacing: -0.02em;
+                }
+
+                .exam-row {
+                    background: rgba(255,255,255,0.02);
+                    border: 1px solid rgba(255,255,255,0.05);
+                    border-radius: 20px;
+                    padding: 1.5rem;
+                    margin-bottom: 1.2rem;
+                }
+
+                .exam-info-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 1.5rem;
+                }
+
+                .name-box label {
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                    display: block;
+                }
+
+                .rol-tag {
+                    font-size: 0.65rem;
+                    font-weight: 900;
+                    background: rgba(255,255,255,0.05);
+                    padding: 0.2rem 0.6rem;
+                    border-radius: 6px;
+                    opacity: 0.5;
+                    margin-top: 0.3rem;
+                    display: inline-block;
+                }
+
+                .exam-grid-container {
+                    display: grid;
+                    grid-template-columns: 280px 1fr;
+                    gap: 1.5rem;
+                }
+
+                .dropzone {
+                    border: 2px dashed rgba(255,255,255,0.1);
+                    border-radius: 16px;
+                    padding: 1rem;
+                    text-align: center;
+                    cursor: pointer;
+                    background: rgba(255,255,255,0.01);
+                    height: 160px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                }
+
                 .dropzone:hover { border-color: var(--brand-primary); background: rgba(255,107,44,0.02); }
-                .dropzone.analizando { border-color: #3b82f6; overflow: hidden; position: relative; }
+                .dropzone.analizando { border-color: #3b82f6; overflow: hidden; }
+                
                 .dz-content .icon { font-size: 1.5rem; margin-bottom: 0.5rem; display: block; }
-                .dz-content p { font-size: 0.8rem; margin: 0.5rem 0; color: var(--text-muted); }
-                .dz-content .formats { font-size: 0.6rem; opacity: 0.4; text-transform: uppercase; letter-spacing: 0.1em; }
+                .dz-content p { font-size: 0.8rem; margin: 0.5rem 0; color: rgba(255,255,255,0.4); }
 
                 .ai-analysing { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
                 .scanner-line { width: 100%; height: 2px; background: #3b82f6; position: absolute; top: 0; left: 0; animation: scan 2s linear infinite; box-shadow: 0 0 15px #3b82f6; }
                 @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
 
-                .file-preview { background: #0f172a; border-radius: 12px; padding: 1.5rem; border: 1px solid rgba(255,255,255,0.1); height: 160px; display: flex; flex-direction: column; justify-content: space-between; }
-                .file-info-row { display: flex; align-items: center; gap: 0.75rem; }
-                .file-icon { font-size: 1.5rem; }
-                .file-name { font-size: 0.8rem; font-weight: 600; }
-                .file-actions { display: flex; gap: 0.5rem; }
-                .btn-view { flex: 1; background: #1e293b; color: #fff; text-align: center; padding: 0.6rem; border-radius: 8px; font-size: 0.75rem; text-decoration: none; border: 1px solid rgba(255,255,255,0.1); }
-                .btn-reset { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.6rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; }
+                .file-preview { 
+                    background: #0f172a; 
+                    border-radius: 16px; 
+                    padding: 1.2rem; 
+                    border: 1px solid rgba(255,255,255,0.1); 
+                    height: 160px; 
+                    display: flex; 
+                    flex-direction: column; 
+                    justify-content: space-between; 
+                }
 
                 .data-entry-area { display: flex; flex-direction: column; gap: 1rem; }
-                .input-group label { font-size: 0.75rem; font-weight: 800; color:rgba(255,255,255,0.5); text-transform: uppercase; margin-bottom: 0.5rem; display: block; }
-                .input-group input, .input-group textarea { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; padding: 0.8rem; width: 100%; outline: none; }
-                .input-group textarea { height: 75px; resize: none; }
-
-                .btn-save-row { background: var(--brand-primary); color: #fff; border: none; padding: 1rem; border-radius: 12px; font-weight: 800; cursor: pointer; font-size: 0.8rem; margin-top: 1.6rem; }
-                .btn-save-row:disabled { opacity: 0.3; cursor: not-allowed; }
-
-                .evaluation-layout { display: grid; grid-template-columns: 1fr 380px; gap: 3rem; }
-                .ai-status-column { position: sticky; top: 2rem; height: fit-content; display: flex; flex-direction: column; gap: 2rem; }
                 
-                .ai-veredict-card { padding: 2.5rem; border-radius: 32px; border: 2px solid; }
-                .ai-veredict-card.apto { background: linear-gradient(135deg, #064e3b, #0d0d0d); border-color: #10b981; }
-                .ai-veredict-card.remediacion { background: linear-gradient(135deg, #451a03, #0d0d0d); border-color: #f59e0b; }
-                .ai-veredict-card.no_apto { background: linear-gradient(135deg, #450a0a, #0d0d0d); border-color: #ef4444; }
-                
-                .veredict-status { font-size: 2.5rem; font-weight: 950; margin: 1rem 0; letter-spacing: -0.03em; }
-                .ai-justification { line-height: 1.7; opacity: 0.8; font-size: 1rem; }
+                .vital-signs-table, .visual-test-table, .audiovestibular-table, .lifestyle-table {
+                    background: #050505;
+                    padding: 1.2rem;
+                    border-radius: 16px;
+                    border: 1px solid rgba(255,107,44,0.1);
+                }
 
-                .form-actions-footer { padding: 2.5rem; border-radius: 32px; margin-top: 4rem; display: flex; justify-content: space-between; align-items: center; }
-                .footer-btns { display: flex; gap: 1rem; }
-                .btn { padding: 1.2rem 2.5rem; border-radius: 16px; font-weight: 900; border: none; cursor: pointer; transition: 0.3s; }
+                .vital-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 1rem; }
+                .vital-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; margin-bottom: 0.4rem; display: block; }
+                .vital-item input { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; width: 100%; font-weight: 700; }
+
+                .form-actions-footer { 
+                    padding: 2.5rem; 
+                    border-radius: 32px; 
+                    margin-top: 4rem; 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    background: rgba(255,255,255,0.02);
+                }
+
+                .ai-status-column { position: sticky; top: 2rem; height: fit-content; }
+                
+                .ai-veredict-card { 
+                    padding: 2rem; 
+                    border-radius: 32px; 
+                    border: 1px solid rgba(255,255,255,0.1); 
+                    background: #0a0a0a;
+                }
+
+                .veredict-status { font-size: 2rem; font-weight: 950; margin: 1rem 0; color: var(--brand-primary); }
+                
+                .btn { 
+                    padding: 1.2rem 2.5rem; 
+                    border-radius: 16px; 
+                    font-weight: 900; 
+                    border: none; 
+                    cursor: pointer; 
+                    transition: 0.2s; 
+                }
                 .btn-primary { background: #fff; color: #000; }
                 .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
-                .btn-primary:disabled { opacity: 0.2; }
-
-                /* Vital Signs Specialized Table */
-                .vital-signs-table { background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 16px; border: 1px solid rgba(255,107,44,0.1); width: 100%; }
-                .vital-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 1rem; }
-                .vital-item { display: flex; flex-direction: column; gap: 0.5rem; }
-                .vital-item label { font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
-                .vital-item input { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem; color: #fff; font-size: 0.9rem; font-weight: 700; text-align: center; width: 100%; }
-                .vital-item input:focus { border-color: var(--brand-primary); outline: none; }
-                
-                .pa-group { grid-column: span 2; }
-                .flex-pa { display: flex; align-items: center; gap: 0.4rem; }
-                .flex-pa span { opacity: 0.5; font-weight: 900; }
-                
-                .vital-item.highlight { background: rgba(255,107,44,0.05); padding: 0.5rem; border-radius: 10px; border: 1px solid rgba(255,107,44,0.2); }
-                .calc-val { font-size: 1.1rem; font-weight: 950; color: var(--brand-primary); text-align: center; padding: 0.3rem; }
-
-                /* Visual Test Styles */
-                .visual-test-table { background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 16px; border: 1px solid rgba(255,107,44,0.1); width: 100%; font-family: 'Inter', sans-serif; }
-                .vt-section { display: flex; flex-direction: column; gap: 0.8rem; }
-                .vt-title { font-size: 0.7rem; font-weight: 900; color: var(--brand-primary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.4rem; }
-                .vt-lentes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.5rem; }
-                .vt-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; cursor: pointer; color: #fff; }
-                .vt-check input { width: 14px; height: 14px; accent-color: var(--brand-primary); }
-                
-                .vt-acuity-grid { display: flex; flex-direction: column; gap: 0.4rem; }
-                .vta-header { display: grid; grid-template-columns: 80px 1fr 1fr 1fr 1fr; gap: 0.5rem; font-size: 0.6rem; font-weight: 900; color: var(--text-muted); text-transform: uppercase; text-align: center; }
-                .vta-row { display: grid; grid-template-columns: 80px 1fr 1fr 1fr 1fr; gap: 0.5rem; align-items: center; }
-                .vta-label { font-size: 0.75rem; font-weight: 800; color: #fff; }
-                .vta-row input { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 0.4rem; color: #fff; font-size: 0.8rem; text-align: center; width: 100%; outline: none; }
-                .vta-row input:focus { border-color: var(--brand-primary); }
-
-                .vt-misc-grid { display: grid; grid-template-columns: 140px 1fr; gap: 1.5rem; }
-                .vt-misc-item label { font-size: 0.6rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem; display: block; }
-                
-                .vt-mini-inputs { display: grid; grid-template-columns: repeat(9, 1fr); gap: 0.3rem; }
-                .vt-tiny { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0.3rem; color: #fff; font-size: 0.7rem; text-align: center; width: 100%; outline: none; }
-                
-                .flex-si-no { display: flex; gap: 0.3rem; }
-                .flex-si-no button { flex: 1; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); color: #fff; padding: 0.4rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; cursor: pointer; transition: 0.2s; }
-                .flex-si-no button.active { background: var(--brand-primary); border-color: var(--brand-primary); }
-
-                /* Number Line (Recta Numérica) */
-                .number-line { position: relative; padding: 1.2rem 0.5rem 0.5rem; }
-                .number-line-track { position: absolute; top: 1.55rem; left: 0.5rem; right: 0.5rem; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; }
-                .number-line-fill { height: 100%; background: var(--brand-primary); border-radius: 2px; transition: width 0.25s ease; }
-                .number-line-points { display: flex; justify-content: space-between; position: relative; z-index: 1; }
-                .nl-point { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; background: none; border: none; cursor: pointer; padding: 0; transition: 0.2s; }
-                .nl-point:disabled { cursor: not-allowed; opacity: 0.4; }
-                .nl-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); background: #0f172a; transition: 0.25s; }
-                .nl-point.filled .nl-dot { border-color: var(--brand-primary); background: rgba(255,107,44,0.15); }
-                .nl-point.selected .nl-dot { border-color: var(--brand-primary); background: var(--brand-primary); box-shadow: 0 0 10px rgba(255,107,44,0.4); transform: scale(1.3); }
-                .nl-label { font-size: 0.7rem; font-weight: 800; color: rgba(255,255,255,0.35); transition: 0.2s; }
-                .nl-point.selected .nl-label { color: var(--brand-primary); font-size: 0.8rem; }
-                .nl-point.filled .nl-label { color: rgba(255,255,255,0.6); }
-                .nl-point:hover:not(:disabled) .nl-dot { border-color: var(--brand-primary); transform: scale(1.15); }
-                
-                .vt-animal-color-flex { display: flex; gap: 2rem; }
-                .vt-animales-box, .vt-colores-box { flex: 1; }
-                .vt-animales-box label, .vt-colores-box label { font-size: 0.6rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem; display: block; }
-                
-                .vt-animal-rows { display: flex; flex-direction: column; gap: 0.3rem; }
-                .vt-a-row { display: flex; align-items: center; gap: 0.4rem; }
-                .row-id { font-size: 0.7rem; font-weight: 900; width: 12px; opacity: 0.5; }
-                .vt-tiny-sq { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0.2rem; color: #fff; font-size: 0.7rem; text-align: center; width: 25px; outline: none; }
-                
-                .vt-col-grid { display: flex; gap: 0.5rem; }
-                .vt-col-item { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
-                .vt-col-item span { font-size: 0.6rem; opacity: 0.5; font-weight: 900; }
-                .mini-btn button { padding: 0.2rem 0.4rem; font-size: 0.6rem; min-width: 20px; }
-
-                /* Color Discrimination Table */
-                .vt-color-table { background: rgba(255,107,44,0.03); border: 1px solid rgba(255,107,44,0.1); border-radius: 12px; overflow: hidden; }
-                .vt-color-header { display: grid; grid-template-columns: 40px 1fr 1fr; background: rgba(255,107,44,0.1); padding: 0.5rem; border-bottom: 1px solid rgba(255,107,44,0.2); }
-                .vt-color-header span { font-size: 0.65rem; font-weight: 900; color: var(--brand-primary); text-align: center; }
-                .vt-color-row { display: grid; grid-template-columns: 40px 1fr 1fr; border-bottom: 1px solid rgba(255,107,44,0.1); align-items: center; }
-                .vt-color-row:last-child { border-bottom: none; }
-                .row-num { font-size: 0.75rem; font-weight: 800; color: #fff; text-align: center; background: rgba(255,255,255,0.02); height: 100%; display: flex; align-items: center; justify-content: center; border-right: 1px solid rgba(255,107,44,0.1); }
-                .check-cell { display: flex; justify-content: center; align-items: center; padding: 0.6rem; border-right: 1px solid rgba(255,107,44,0.05); }
-                .check-cell:last-child { border-right: none; }
-                .check-cell input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--brand-primary); appearance: none; -webkit-appearance: none; background: #0f172a; border: 2px solid rgba(255,255,255,0.15); border-radius: 4px; transition: 0.2s; position: relative; }
-                .check-cell input[type="checkbox"]:checked { background: var(--brand-primary); border-color: var(--brand-primary); }
-                .check-cell input[type="checkbox"]:checked::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #fff; font-size: 12px; font-weight: 900; }
-                .check-cell input[type="checkbox"]:hover:not(:disabled) { border-color: var(--brand-primary); }
-
-                /* Animal Table (6 columns: label + 5 checks) */
-                .animal-header { grid-template-columns: 40px repeat(5, 1fr); }
-                .animal-row { grid-template-columns: 40px repeat(5, 1fr); }
-
-                .mt { margin-top: 1rem; }
-
-                /* Lifestyle / Estilo de Vida Styles */
-                .lifestyle-table { background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 16px; border: 1px solid rgba(255,107,44,0.1); width: 100%; }
-                .ls-grid { display: flex; flex-direction: column; gap: 1.2rem; }
-                .ls-item { display: flex; flex-direction: column; gap: 0.5rem; }
-                .group-horizontal { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-                .ls-field label, .ls-item label { font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; }
-                .ls-item input { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem; color: #fff; font-size: 0.9rem; font-weight: 700; width: 100%; outline: none; }
-                .ls-item input:focus { border-color: var(--brand-primary); }
-                
-                .ls-select-group { display: flex; gap: 0.4rem; }
-                .ls-select-group button { flex: 1; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 0.5rem; border-radius: 8px; font-size: 0.7rem; font-weight: 800; cursor: pointer; transition: 0.2s; }
-                .ls-select-group button.active { background: var(--brand-primary); border-color: var(--brand-primary); }
+                .btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
                 @media (max-width: 1200px) {
-                    .exam-grid-container { grid-template-columns: 1fr; }
-                    .dropzone-area { max-width: 100%; }
                     .evaluation-layout { grid-template-columns: 1fr; }
                     .ai-status-column { position: static; }
+                }
+
+                .empty-state {
+                    padding: 5rem 2rem;
+                    text-align: center;
+                    background: rgba(255,255,255,0.01);
+                    border-radius: 40px;
+                    border: 1px solid rgba(255,255,255,0.05);
+                    margin-top: 2rem;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 1.5rem;
+                }
+                .empty-icon { font-size: 4rem; filter: grayscale(1); opacity: 0.15; }
+                .empty-state h3 { font-size: 1.8rem; font-weight: 900; margin: 0; color: rgba(255,255,255,0.9); letter-spacing: -0.02em; }
+                .empty-state p { opacity: 0.4; max-width: 320px; margin: 0; line-height: 1.8; font-size: 1rem; }
+
+                .dz-content .formats { font-size: 0.6rem; opacity: 0.3; text-transform: uppercase; letter-spacing: 0.15em; margin-top: 0.5rem; display: block; font-weight: 800; }
+                
+                .glass {
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
                 }
             `}</style>
         </div >
