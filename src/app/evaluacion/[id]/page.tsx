@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { evaluarParametrosClinicos } from '@/lib/skills/evaluadorClinico'
 import { formatearRUT } from '@/lib/skills/formateadorRUT'
 import { getFormComponent } from './formularios'
+import FotoUpload from './formularios/FotoUpload'
 
 export default function EvaluacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
@@ -22,6 +23,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
 
     // Form values for exams (id_examen -> { resultado, documento_url, observaciones })
     const [resultados, setResultados] = useState<Record<string, any>>({})
+    const [fotos, setFotos] = useState<Record<string, string[]>>({})
     const [currentRol, setCurrentRol] = useState<string>('Clínico') // Estación inicial sugerida
 
     const estaciones = [
@@ -433,6 +435,13 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                                 />
                                                             )
                                                         })()}
+                                                        <FotoUpload
+                                                            examId={ex.id}
+                                                            fotos={fotos[ex.id] || []}
+                                                            onAddFoto={(exId, foto) => setFotos(prev => ({ ...prev, [exId]: [...(prev[exId] || []), foto] }))}
+                                                            onRemoveFoto={(exId, idx) => setFotos(prev => ({ ...prev, [exId]: (prev[exId] || []).filter((_, i) => i !== idx) }))}
+                                                            disabled={!isEditable || ex.estado === 'finalizado'}
+                                                        />
                                                     </div>
                                                 </div>
 
@@ -441,7 +450,7 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                         <button
                                                             className="btn-save-row"
                                                             onClick={() => guardarExamen(ex.id)}
-                                                            disabled={!res.resultado && !res.documento_url && !res.pulso && !res.lejos_od && !res.fuma && !res.audio_od_1000}
+                                                            disabled={!res.resultado && !res.documento_url && !res.pulso && !res.lejos_od && !res.fuma && !res.audio_od_1000 && !(fotos[ex.id]?.length) && !Object.keys(res).some(k => k !== 'resultado' && res[k])}
                                                         >
                                                             Guardar
                                                         </button>
@@ -739,7 +748,10 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
 
                 .data-entry-area { display: flex; flex-direction: column; gap: 1rem; }
                 
-                .vital-signs-table, .visual-test-table, .audiovestibular-table, .lifestyle-table {
+                .vital-signs-table, .visual-test-table, .audiovestibular-table, .lifestyle-table,
+                .epworth-form, .romberg-form, .framingham-form, .ecg-form, .psicotecnico-form,
+                .psicologico-form, .laboratorio-form, .radiologia-form, .consulta-medica-form,
+                .consentimiento-form {
                     background: #050505;
                     padding: 1.2rem;
                     border-radius: 16px;
@@ -749,6 +761,130 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                 .vital-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 1rem; }
                 .vital-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; margin-bottom: 0.4rem; display: block; }
                 .vital-item input { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; width: 100%; font-weight: 700; }
+
+                /* ─── Shared form utilities ─── */
+                .form-section { margin-top: 1.2rem; }
+                .form-subtitle { font-size: 0.7rem; opacity: 0.5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+                .section-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin: 0 0 0.8rem 0; }
+
+                /* Shared form inputs */
+                .form-section input, .form-section select, .form-section textarea {
+                    background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; width: 100%; font-family: inherit; font-size: 0.85rem;
+                }
+                .form-section textarea { resize: vertical; min-height: 60px; }
+                .form-section select { cursor: pointer; }
+                .form-section label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; margin-bottom: 0.3rem; display: block; }
+
+                /* ─── Epworth ─── */
+                .epworth-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+                .epworth-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                .epworth-label { font-size: 0.8rem; flex: 1; }
+                .epworth-options { display: flex; gap: 4px; }
+                .epworth-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #111; color: #fff; font-weight: 800; cursor: pointer; transition: 0.15s; }
+                .epworth-btn.active { background: var(--brand-primary, #ff6b2c); border-color: var(--brand-primary, #ff6b2c); color: #000; }
+                .epworth-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+                .epworth-result { margin-top: 1rem; padding: 1rem; border-radius: 12px; border: 2px solid; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); }
+                .epworth-score { font-size: 1rem; font-weight: 700; }
+                .epworth-interp { font-weight: 900; font-size: 0.85rem; }
+
+                /* ─── Romberg / Shared toggle buttons ─── */
+                .romberg-grid { display: flex; flex-direction: column; gap: 0.4rem; }
+                .romberg-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                .romberg-label { font-size: 0.8rem; flex: 1; }
+                .romberg-options { display: flex; gap: 4px; }
+                .romberg-btn { padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #111; color: #fff; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: 0.15s; }
+                .romberg-btn.active-ok { background: #10b981; border-color: #10b981; color: #000; }
+                .romberg-btn.active-alert { background: #ef4444; border-color: #ef4444; color: #fff; }
+                .romberg-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+                .romberg-obs { width: 100%; }
+                .romberg-result { margin-top: 1rem; padding: 0.8rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.85rem; text-align: center; }
+                .romberg-result.ok { background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.2); }
+                .romberg-result.alert { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
+                .romberg-result.warn { background: rgba(245,158,11,0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
+
+                /* ─── Framingham ─── */
+                .fram-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+                .fram-item { display: flex; flex-direction: column; gap: 4px; }
+                .fram-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; }
+                .fram-item input { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; font-weight: 700; }
+                .flex-si-no { display: flex; gap: 4px; }
+                .flex-si-no button { flex: 1; padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #111; color: #fff; font-weight: 700; cursor: pointer; transition: 0.15s; font-size: 0.8rem; }
+                .flex-si-no button.active { background: var(--brand-primary, #ff6b2c); border-color: var(--brand-primary, #ff6b2c); color: #000; }
+                .flex-si-no button:disabled { opacity: 0.3; cursor: not-allowed; }
+                .fram-result { margin-top: 1.2rem; padding: 1rem; border-radius: 12px; border: 2px solid; background: rgba(255,255,255,0.02); text-align: center; }
+                .fram-score { font-size: 1rem; font-weight: 700; }
+                .fram-riesgo { font-size: 1.1rem; font-weight: 900; margin-top: 0.3rem; }
+
+                /* ─── ECG ─── */
+                .ecg-params-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; }
+                .ecg-item { display: flex; flex-direction: column; gap: 4px; }
+                .ecg-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; }
+                .ecg-item input, .ecg-item select { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; font-weight: 700; }
+                .ecg-hallazgos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.3rem; }
+                .ecg-hallazgo-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+                .ecg-hallazgo-label { font-size: 0.8rem; }
+
+                /* ─── Psicotecnico ─── */
+                .psico-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+                .psico-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.7rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+                .psico-info { display: flex; flex-direction: column; flex: 1; }
+                .psico-label { font-weight: 700; font-size: 0.85rem; }
+                .psico-desc { font-size: 0.7rem; opacity: 0.4; }
+                .psico-options { display: flex; gap: 4px; }
+                .psico-btn { padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #111; color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: 0.15s; }
+                .psico-btn.active { color: #fff; }
+                .psico-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+                /* ─── Psicologico ─── */
+                .psi-grid { display: grid; grid-template-columns: 1fr; gap: 0.8rem; }
+                .psi-item { display: flex; flex-direction: column; gap: 4px; }
+                .psi-item label { font-size: 0.75rem; font-weight: 700; opacity: 0.7; }
+                .psi-item textarea { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; font-family: inherit; font-size: 0.85rem; resize: vertical; }
+
+                /* ─── Laboratorio ─── */
+                .lab-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; }
+                .lab-item { display: flex; flex-direction: column; gap: 3px; }
+                .lab-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; }
+                .lab-item input { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem; color: #fff; font-weight: 700; font-size: 0.85rem; }
+                .lab-ref { font-size: 0.6rem; opacity: 0.3; font-style: italic; }
+                .lab-drogas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.4rem; }
+                .lab-droga-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
+                /* ─── Radiologia ─── */
+                .rx-params-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+                .rx-item { display: flex; flex-direction: column; gap: 4px; }
+                .rx-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; }
+                .rx-item select { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; font-weight: 700; cursor: pointer; }
+
+                /* ─── Consulta Medica ─── */
+                .med-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+                .med-item { display: flex; flex-direction: column; gap: 4px; }
+                .med-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; }
+                .med-item input, .med-item textarea { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; font-family: inherit; font-size: 0.85rem; }
+                .med-sistemas-grid { display: flex; flex-direction: column; gap: 0.3rem; }
+                .med-sistema-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+                .med-sistema-label { font-size: 0.8rem; flex: 1; min-width: 160px; }
+                .med-detalle-input { width: 100% !important; margin-top: 4px; background: #111 !important; border: 1px solid rgba(239,68,68,0.3) !important; border-radius: 8px; padding: 0.5rem; color: #fff; font-size: 0.8rem; }
+
+                /* ─── Consentimiento ─── */
+                .consent-text { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 1rem 1.2rem; font-size: 0.85rem; line-height: 1.7; }
+                .consent-text p { margin: 0 0 0.5rem 0; font-weight: 700; }
+                .consent-text ul { margin: 0; padding-left: 1.2rem; }
+                .consent-text li { margin-bottom: 0.4rem; opacity: 0.7; }
+                .consent-checks { display: flex; flex-direction: column; gap: 0.8rem; margin-top: 0.5rem; }
+                .consent-check-item { display: flex; align-items: center; gap: 0.8rem; cursor: pointer; font-size: 0.85rem; }
+                .consent-check-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--brand-primary, #ff6b2c); cursor: pointer; }
+                .consent-firma-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+                .consent-firma-item { display: flex; flex-direction: column; gap: 4px; }
+                .consent-firma-item label { font-size: 0.65rem; font-weight: 800; opacity: 0.5; text-transform: uppercase; }
+                .consent-firma-item input { background: #111; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem; color: #fff; font-weight: 700; }
+
+                /* ─── Photo upload fallback ─── */
+                .photo-upload-section { margin-top: 0.8rem; padding: 0.8rem; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); }
+                .photo-upload-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: pointer; font-size: 0.75rem; font-weight: 700; transition: 0.15s; width: 100%; justify-content: center; }
+                .photo-upload-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+                .photo-preview { margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+                .photo-preview img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
 
                 .form-actions-footer { 
                     padding: 2.5rem; 
@@ -786,6 +922,13 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                 @media (max-width: 1200px) {
                     .evaluation-layout { grid-template-columns: 1fr; }
                     .ai-status-column { position: static; }
+                }
+
+                @media (max-width: 768px) {
+                    .epworth-row { flex-direction: column; align-items: flex-start; }
+                    .romberg-row, .ecg-hallazgo-row, .psico-row, .med-sistema-row { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+                    .fram-grid, .ecg-params-grid, .lab-grid { grid-template-columns: 1fr 1fr; }
+                    .med-grid { grid-template-columns: 1fr; }
                 }
 
                 .empty-state {
