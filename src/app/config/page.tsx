@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatChileanPhone } from '@/lib/formatters'
 import { formatearRUT, normalizarRUT } from '@/lib/skills/formateadorRUT'
+import { FORM_REGISTRY, DefaultForm } from '@/app/evaluacion/[id]/formularios'
+
 
 interface Empresa {
     id: string;
@@ -42,8 +44,8 @@ const TIPOS_FORMULARIO: Record<string, { label: string; icon: string; color: str
     test_visual: { label: 'Test Visual', icon: '👁️', color: '#8b5cf6' },
     audiometria: { label: 'Audiometría', icon: '🦻', color: '#f59e0b' },
     estilo_vida: { label: 'Estilo de Vida', icon: '🏃', color: '#06b6d4' },
-    escala_epworth: { label: 'Escala Epworth', icon: '😴', color: '#6366f1' },
-    romberg: { label: 'Prueba Equilibrio', icon: '⚖️', color: '#ec4899' },
+    escala_epworth: { label: 'Calidad de Sueño', icon: '😴', color: '#6366f1' },
+    romberg: { label: 'Prueba de Romberg', icon: '⚖️', color: '#8b5cf6' },
     framingham: { label: 'Riesgo Cardiovascular', icon: '❤️', color: '#ef4444' },
     ecg: { label: 'Electrocardiograma', icon: '💓', color: '#f43f5e' },
     psicotecnico: { label: 'Psicotécnico', icon: '🚦', color: '#22c55e' },
@@ -52,6 +54,8 @@ const TIPOS_FORMULARIO: Record<string, { label: string; icon: string; color: str
     radiologia: { label: 'Radiología', icon: '🩻', color: '#78716c' },
     consulta_medica: { label: 'Consulta Médica', icon: '👨‍⚕️', color: '#14b8a6' },
     consentimiento: { label: 'Consentimiento', icon: '📋', color: '#94a3b8' },
+    consentimiento_general: { label: 'Consentimiento General', icon: '📄', color: '#64748b' },
+    alcohol_drogas: { label: 'Alcohol y Drogas', icon: '🍺', color: '#8b5cf6' },
 }
 
 interface Bateria {
@@ -118,6 +122,7 @@ export default function ConfigPage() {
     const [showPrestacionBulkPanel, setShowPrestacionBulkPanel] = useState(false)
     const [editingPrestacion, setEditingPrestacion] = useState<Prestacion | null>(null)
     const [bulkFile, setBulkFile] = useState<File | null>(null)
+
 
     const [showBateriaPanel, setShowBateriaPanel] = useState(false)
     const [editingBateria, setEditingBateria] = useState<Bateria | null>(null)
@@ -1233,37 +1238,19 @@ export default function ConfigPage() {
                                                     onChange={e => setNewPrestacion({ ...newPrestacion, costo: Number(e.target.value) })}
                                                 />
                                             </div>
+
                                             <div className="form-group">
-                                                <label>📋 Tipo de Formulario</label>
-                                                <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: '-0.3rem 0 0.5rem', lineHeight: 1.3 }}>Define qué formulario especializado se mostrará al profesional durante la evaluación del paciente.</p>
+                                                <label>Tipo de Formulario</label>
                                                 <select
-                                                    value={newPrestacion.tipo_formulario}
+                                                    value={newPrestacion.tipo_formulario || 'default'}
                                                     onChange={e => setNewPrestacion({ ...newPrestacion, tipo_formulario: e.target.value })}
-                                                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.8rem', color: 'white' }}
                                                 >
-                                                    {Object.entries(TIPOS_FORMULARIO).map(([key, { label, icon }]) => (
-                                                        <option key={key} value={key}>{icon} {label}</option>
+                                                    {Object.entries(TIPOS_FORMULARIO).map(([key, val]) => (
+                                                        <option key={key} value={key}>{val.icon} {val.label}</option>
                                                     ))}
                                                 </select>
-                                                {newPrestacion.tipo_formulario && newPrestacion.tipo_formulario !== 'default' && (
-                                                    <div style={{
-                                                        marginTop: '0.5rem',
-                                                        padding: '0.6rem 0.8rem',
-                                                        borderRadius: '10px',
-                                                        background: `${TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.color || '#64748b'}15`,
-                                                        border: `1px solid ${TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.color || '#64748b'}30`,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '0.5rem',
-                                                        fontSize: '0.8rem'
-                                                    }}>
-                                                        <span style={{ fontSize: '1.1rem' }}>{TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.icon}</span>
-                                                        <span style={{ color: TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.color, fontWeight: 700 }}>
-                                                            {TIPOS_FORMULARIO[newPrestacion.tipo_formulario]?.label}
-                                                        </span>
-                                                    </div>
-                                                )}
                                             </div>
+
                                             <div className="form-group">
                                                 <label>Descripción</label>
                                                 <textarea
@@ -1274,9 +1261,105 @@ export default function ConfigPage() {
                                                     style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.8rem', color: 'white', resize: 'none' }}
                                                 />
                                             </div>
-                                            <button className="btn btn-primary mt-6 full-width" onClick={savePrestacion}>
-                                                {editingPrestacion ? 'Actualizar Cambios' : 'Registrar Prestación'}
-                                            </button>
+
+                                            {/* ===== VISTA PREVIA DEL FORMULARIO ===== */}
+                                            {editingPrestacion && (() => {
+                                                const tipoForm = newPrestacion.tipo_formulario || 'default'
+                                                const FormComponent = FORM_REGISTRY[tipoForm]
+                                                const tipoInfo = TIPOS_FORMULARIO[tipoForm] || TIPOS_FORMULARIO['default']
+
+                                                return (
+                                                    <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <span>{tipoInfo.icon}</span>
+                                                            Vista Previa del Formulario
+                                                            <span style={{
+                                                                fontSize: '0.65rem',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '6px',
+                                                                background: `${tipoInfo.color}22`,
+                                                                color: tipoInfo.color,
+                                                                fontWeight: 600
+                                                            }}>
+                                                                {tipoInfo.label}
+                                                            </span>
+                                                        </label>
+                                                        <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: '-0.3rem 0 0.8rem', lineHeight: 1.3 }}>
+                                                            Así se ve el formulario que completará el profesional durante la evaluación.
+                                                        </p>
+
+                                                        {FormComponent ? (
+                                                            <div style={{
+                                                                border: '1px dashed rgba(255,255,255,0.12)',
+                                                                borderRadius: '14px',
+                                                                padding: '1rem',
+                                                                background: 'rgba(0,0,0,0.2)',
+                                                                maxHeight: '500px',
+                                                                overflowY: 'auto',
+                                                                position: 'relative'
+                                                            }}>
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    top: '8px',
+                                                                    right: '10px',
+                                                                    fontSize: '0.6rem',
+                                                                    color: 'rgba(255,255,255,0.25)',
+                                                                    background: 'rgba(0,0,0,0.4)',
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '4px',
+                                                                    zIndex: 10,
+                                                                    letterSpacing: '0.5px',
+                                                                    textTransform: 'uppercase'
+                                                                }}>
+                                                                    SOLO LECTURA — Vista Previa
+                                                                </div>
+                                                                <div style={{ transform: 'scale(0.88)', transformOrigin: 'top left', width: '113.6%', pointerEvents: 'none', opacity: 0.85 }}>
+                                                                    <FormComponent
+                                                                        examId="preview"
+                                                                        resultados={{
+                                                                            consent_nombre: 'Juan Pérez Ejemplo',
+                                                                            consent_rut: '12.345.678-9',
+                                                                        }}
+                                                                        updateField={() => { }}
+                                                                        isEditable={false}
+                                                                        isFinalizado={true}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{
+                                                                border: '1px dashed rgba(255,255,255,0.08)',
+                                                                borderRadius: '14px',
+                                                                padding: '2rem',
+                                                                textAlign: 'center',
+                                                                background: 'rgba(0,0,0,0.15)'
+                                                            }}>
+                                                                <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>📝</span>
+                                                                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+                                                                    Formulario de texto libre (por defecto)
+                                                                </p>
+                                                                <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)', margin: '0.3rem 0 0' }}>
+                                                                    El profesional verá un campo de resultado libre y observaciones.
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })()}
+
+                                            <div style={{
+                                                position: 'sticky',
+                                                bottom: 0,
+                                                paddingTop: '1rem',
+                                                paddingBottom: '0.5rem',
+                                                background: 'linear-gradient(to top, rgba(15,15,25,1) 60%, rgba(15,15,25,0))',
+                                                zIndex: 10,
+                                                marginTop: '1.5rem'
+                                            }}>
+                                                <button className="btn btn-primary full-width" onClick={savePrestacion}>
+                                                    {editingPrestacion ? 'Actualizar Cambios' : 'Registrar Prestación'}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1451,21 +1534,7 @@ export default function ConfigPage() {
                                                         ${Number(p.costo).toLocaleString()}
                                                     </td>
                                                     <td>
-                                                        <span style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '0.3rem',
-                                                            padding: '0.25rem 0.6rem',
-                                                            borderRadius: '8px',
-                                                            fontSize: '0.72rem',
-                                                            fontWeight: 700,
-                                                            background: `${TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.color || '#64748b'}18`,
-                                                            color: TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.color || '#64748b',
-                                                            border: `1px solid ${TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.color || '#64748b'}30`,
-                                                            whiteSpace: 'nowrap'
-                                                        }}>
-                                                            {TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.icon} {TIPOS_FORMULARIO[p.tipo_formulario || 'default']?.label || p.tipo_formulario}
-                                                        </span>
+
                                                     </td>
                                                     <td>
                                                         <div className="wl-actions" style={{ justifyContent: 'flex-end' }}>
@@ -2542,6 +2611,8 @@ export default function ConfigPage() {
                     box-shadow: 0 8px 25px rgba(239,68,68,0.4);
                 }
             `}</style>
+
+
         </div >
     )
 }

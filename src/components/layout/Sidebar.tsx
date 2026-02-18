@@ -18,7 +18,7 @@ const menuItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark'

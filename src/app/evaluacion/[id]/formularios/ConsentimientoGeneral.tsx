@@ -3,25 +3,28 @@ import { FormularioProps, isFieldDisabled } from './types'
 import { useRef, useEffect, useState } from 'react'
 
 /**
- * Consentimiento — Carta de Consentimiento Para Examen de Drogas.
+ * Consentimiento General de Ingreso — Anexo N°1.
  * Documento oficial de Prevenort Centro Médico.
- * - Texto legal fijo (lectura obligatoria)
- * - Declaración de medicamentos (hasta 4)
- * - Fecha automática del día
- * - Firma digital del paciente (canvas)
- * Aplicado por: Administración
+ * 
+ * Basado en el documento físico:
+ * - Autorización Ley N° 19628 para entrega de resultados al empleador
+ * - Autorización a PREVENORT para informar resultados
+ * - Derechos del paciente (copia de certificado, 24hrs)
+ * - Condiciones de retiro (personal o poder notarial)
+ * - "Tomo Conocimiento" + Firma + Fecha
+ * 
+ * Aplicado por: Administración (ADM-0003)
  */
 
 function getFechaFormateada(): string {
-    const meses = [
-        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-    ]
     const hoy = new Date()
-    return `Antofagasta, ${hoy.getDate()} de ${meses[hoy.getMonth()]} año ${hoy.getFullYear()}`
+    const dd = String(hoy.getDate()).padStart(2, '0')
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0')
+    const yyyy = hoy.getFullYear()
+    return `${dd}/${mm}/${yyyy}`
 }
 
-export default function Consentimiento({ examId, resultados: res, updateField, isEditable, isFinalizado }: FormularioProps) {
+export default function ConsentimientoGeneral({ examId, resultados: res, updateField, isEditable, isFinalizado }: FormularioProps) {
     const disabled = isFieldDisabled(isEditable, isFinalizado)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [isDrawing, setIsDrawing] = useState(false)
@@ -29,11 +32,10 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
 
     // Auto-set fecha al montar
     useEffect(() => {
-        if (!res.consent_fecha) {
-            updateField(examId, 'consent_fecha', getFechaFormateada())
+        if (!res.cgi_fecha) {
+            updateField(examId, 'cgi_fecha', getFechaFormateada())
         }
-        // Si ya tiene firma guardada, marcar
-        if (res.consent_firma_data) {
+        if (res.cgi_firma_data) {
             setHasFirma(true)
             loadSavedSignature()
         }
@@ -43,7 +45,7 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
     const getCtx = () => canvasRef.current?.getContext('2d') || null
 
     const loadSavedSignature = () => {
-        if (!res.consent_firma_data || !canvasRef.current) return
+        if (!res.cgi_firma_data || !canvasRef.current) return
         const img = new Image()
         img.onload = () => {
             const ctx = getCtx()
@@ -52,7 +54,7 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
                 ctx.drawImage(img, 0, 0)
             }
         }
-        img.src = res.consent_firma_data
+        img.src = res.cgi_firma_data
     }
 
     const initCanvas = () => {
@@ -68,7 +70,7 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
 
     useEffect(() => {
         initCanvas()
-        if (res.consent_firma_data) loadSavedSignature()
+        if (res.cgi_firma_data) loadSavedSignature()
     }, [canvasRef.current])
 
     const getPos = (e: React.MouseEvent | React.TouchEvent) => {
@@ -114,11 +116,10 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
         if (!isDrawing) return
         setIsDrawing(false)
         setHasFirma(true)
-        // Guardar la firma como data URL
         const canvas = canvasRef.current
         if (canvas) {
             const dataUrl = canvas.toDataURL('image/png')
-            updateField(examId, 'consent_firma_data', dataUrl)
+            updateField(examId, 'cgi_firma_data', dataUrl)
         }
     }
 
@@ -129,12 +130,12 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
         if (!ctx) return
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         setHasFirma(false)
-        updateField(examId, 'consent_firma_data', '')
+        updateField(examId, 'cgi_firma_data', '')
     }
 
     return (
         <div className="consentimiento-form card glass">
-            {/* ─── Encabezado del documento ─── */}
+            {/* ─── Encabezado del documento (idéntico al Consentimiento de Drogas) ─── */}
             <div className="consent-header">
                 <div className="consent-logo">
                     <span className="consent-logo-icon">⚕</span>
@@ -143,107 +144,102 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
                         <span className="consent-logo-sub">Centro Médico</span>
                     </div>
                 </div>
-                <h3 className="consent-title">Carta de Consentimiento Para Examen de Drogas</h3>
+                <div style={{ marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, opacity: 0.7, display: 'block' }}>ÁREA MÉDICA</span>
+                    <span style={{ fontSize: '0.7rem', opacity: 0.4 }}>Pasaje Isaac Arce #209 · Fono: 2467600</span>
+                </div>
+                <h3 className="consent-title">Consentimiento Informado</h3>
+                <span style={{ fontSize: '0.72rem', opacity: 0.4, fontStyle: 'italic' }}>Anexo N°1 — Ley N° 19.628 sobre Protección de Datos</span>
+            </div>
+
+            {/* ─── Texto Legal 1: Autorización Ley 19628 ─── */}
+            <div className="consent-legal-text">
+                <p>
+                    Para dar cumplimiento a lo dispuesto en la ley n° 19.628, se solicita a ud. su autorización
+                    para dar a su empleador el o los resultados de los exámenes médicos y/o de Laboratorio que
+                    se realice, si estos fueran requeridos.
+                </p>
             </div>
 
             {/* ─── Identificación del paciente ─── */}
             <div className="consent-id-section">
                 <div className="consent-id-row">
                     <span className="consent-label-inline">Yo:</span>
-                    <span className="consent-value-line">{res.consent_nombre || '___________________________'}</span>
+                    <span className="consent-value-line">{res.cgi_nombre || '___________________________'}</span>
                 </div>
                 <div className="consent-id-row">
-                    <span className="consent-label-inline">RUT Nº:</span>
-                    <span className="consent-value-line">{res.consent_rut || '_______________'}</span>
-                    <span className="consent-label-inline" style={{ marginLeft: '1rem' }}>Mediante la presente DECLARO:</span>
+                    <span className="consent-label-inline">Rut.:</span>
+                    <span className="consent-value-line">{res.cgi_rut || '_______________'}</span>
                 </div>
             </div>
 
-            {/* ─── Texto Legal (solo lectura) ─── */}
+            {/* ─── Texto Legal 2: Autorización entrega de resultados ─── */}
             <div className="consent-legal-text">
                 <p>
-                    No ser consumidor de sustancias psicotrópicas (drogas) y acepto realizarme un test
-                    en muestra de orina tomada con la supervisión directa del personal de Prevenort, lo
-                    que implica su compañía en la realización de la toma de muestra para dar fe que la
-                    toma de muestra cumple con los requisitos exigidos de la misma.
-                </p>
-                <p>
-                    Cabe señalar que la información generada a partir de dicho Examen, será entregada
-                    exclusivamente a la empresa que me ha enviado a evaluar, y que solo ella es la
-                    única responsable de retirar la información obtenida del Análisis efectuado.
-                </p>
-                <p>
-                    Si el análisis ha sido solicitado en forma particular, su resultado será entregado
-                    exclusivamente a la persona individualizada en el documento o su tutor legal.
-                </p>
-                <p>
-                    Por su parte, la Empresa Prevenort spa., se compromete a tratar los resultados con
-                    la más absoluta confidencialidad. Esto con la finalidad de dar cumplimiento a la
-                    normativa legal vigente y en concordancia con el código ético de salud.
-                </p>
-                <p>
-                    La adulteración o falsificación de este certificado y el uso de un certificado falso,
-                    constituye &quot;DELITO&quot; penado por la ley, descrito en los artículos 193, 17, 198 del
-                    código del trabajo.
-                </p>
-                <p>
-                    A continuación deberá informar si por indicación de algún profesional de la salud,
-                    está en tratamiento medicamentoso, lo que declaro a continuación.
+                    Autorizo a PREVENORT, a que haga entrega del informe de los resultados de mi examen médico
+                    y/o Laboratorio a mi empleador, en caso que fueran requeridos por este.
                 </p>
             </div>
 
-            {/* ─── Declaración de Medicamentos ─── */}
-            <div className="consent-meds-section">
-                {[1, 2, 3, 4].map(n => (
-                    <div key={n} className="consent-med-row">
-                        <span className="consent-med-num">{n}.</span>
-                        <input
-                            type="text"
-                            value={res[`consent_med_${n}`] || ''}
-                            onChange={(e) => updateField(examId, `consent_med_${n}`, e.target.value)}
-                            disabled={disabled}
-                            placeholder="Medicamento..."
-                            className="consent-med-input"
+            {/* ─── Texto Legal 3: Derechos del paciente ─── */}
+            <div className="consent-legal-text">
+                <p>
+                    Para dar cumplimiento a la Normativa de los derechos del paciente se le informa lo siguiente:
+                    Usted tiene derecho a una copia de su certificado y exámenes complementarios, los que estarán
+                    disponibles 24 horas después de realizada su evaluación.
+                </p>
+            </div>
+
+            {/* ─── Texto Legal 4: Condiciones de retiro ─── */}
+            <div className="consent-legal-text">
+                <p>
+                    Debe ser retirado solo por usted, en caso contrario debe entregar un poder notarial para ser
+                    entregado a otra persona, donde señale que retira exámenes realizados en nuestro centro en la
+                    fecha indicada.
+                </p>
+            </div>
+
+            {/* ─── Tomo Conocimiento ─── */}
+            <div style={{ padding: '1rem 1.5rem', fontWeight: 700, fontSize: '0.95rem', fontStyle: 'italic', opacity: 0.8 }}>
+                Tomo Conocimiento
+            </div>
+
+            {/* ─── Firma y Fecha ─── */}
+            <div className="consent-firma-fecha-row">
+                <div className="consent-firma-col">
+                    <div className="consent-firma-canvas-wrap">
+                        <canvas
+                            ref={canvasRef}
+                            width={460}
+                            height={140}
+                            className={`consent-canvas ${disabled ? 'disabled' : ''}`}
+                            onMouseDown={startDraw}
+                            onMouseMove={draw}
+                            onMouseUp={stopDraw}
+                            onMouseLeave={stopDraw}
+                            onTouchStart={startDraw}
+                            onTouchMove={draw}
+                            onTouchEnd={stopDraw}
                         />
+                        {!hasFirma && !disabled && (
+                            <div className="consent-firma-placeholder">
+                                ✍️ Firme aquí
+                            </div>
+                        )}
                     </div>
-                ))}
-            </div>
-
-            {/* ─── Fecha ─── */}
-            <div className="consent-fecha-section">
-                <span className="consent-fecha-text">
-                    {res.consent_fecha || getFechaFormateada()}
-                </span>
-            </div>
-
-            {/* ─── Firma Digital ─── */}
-            <div className="consent-firma-section">
-                <div className="consent-firma-canvas-wrap">
-                    <canvas
-                        ref={canvasRef}
-                        width={460}
-                        height={140}
-                        className={`consent-canvas ${disabled ? 'disabled' : ''}`}
-                        onMouseDown={startDraw}
-                        onMouseMove={draw}
-                        onMouseUp={stopDraw}
-                        onMouseLeave={stopDraw}
-                        onTouchStart={startDraw}
-                        onTouchMove={draw}
-                        onTouchEnd={stopDraw}
-                    />
-                    {!hasFirma && !disabled && (
-                        <div className="consent-firma-placeholder">
-                            ✍️ Firme aquí
-                        </div>
+                    <p className="consent-firma-caption">Firma:</p>
+                    {!disabled && hasFirma && (
+                        <button className="consent-btn-clear" onClick={limpiarFirma}>
+                            Limpiar firma
+                        </button>
                     )}
                 </div>
-                <p className="consent-firma-caption">Firma de la persona antes individualizada</p>
-                {!disabled && hasFirma && (
-                    <button className="consent-btn-clear" onClick={limpiarFirma}>
-                        Limpiar firma
-                    </button>
-                )}
+                <div className="consent-fecha-col">
+                    <div className="consent-fecha-value">
+                        {res.cgi_fecha || getFechaFormateada()}
+                    </div>
+                    <p className="consent-firma-caption">Fecha:</p>
+                </div>
             </div>
 
             {/* ─── Estado ─── */}
@@ -266,7 +262,7 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
                     align-items: center;
                     justify-content: center;
                     gap: 0.8rem;
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 1.2rem;
                 }
 
                 .consent-logo-icon {
@@ -302,7 +298,9 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
                     font-weight: 800;
                     letter-spacing: 0.02em;
                     color: #fff;
-                    margin: 0;
+                    margin: 0.8rem 0 0.3rem 0;
+                    text-decoration: underline;
+                    text-underline-offset: 4px;
                 }
 
                 .consent-id-section {
@@ -340,74 +338,50 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
                     border-radius: 16px;
                     background: rgba(255,255,255,0.03);
                     border: 1px solid rgba(255,255,255,0.06);
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 1rem;
                     line-height: 1.7;
                 }
 
                 .consent-legal-text p {
                     font-size: 0.85rem;
-                    margin: 0 0 0.8rem 0;
+                    margin: 0;
                     opacity: 0.85;
                     text-align: justify;
                 }
 
-                .consent-legal-text p:last-child {
-                    margin-bottom: 0;
-                }
-
-                .consent-meds-section {
-                    padding: 1rem 1.5rem;
-                    margin-bottom: 1.5rem;
-                }
-
-                .consent-med-row {
+                .consent-firma-fecha-row {
                     display: flex;
-                    align-items: center;
-                    gap: 0.6rem;
-                    margin-bottom: 0.6rem;
+                    gap: 2rem;
+                    margin-bottom: 1.5rem;
+                    flex-wrap: wrap;
+                    padding: 0 1rem;
                 }
 
-                .consent-med-num {
-                    font-weight: 800;
-                    font-size: 0.85rem;
-                    opacity: 0.5;
-                    width: 20px;
-                }
-
-                .consent-med-input {
-                    flex: 1;
-                    background: rgba(255,255,255,0.04) !important;
-                    border: none !important;
-                    border-bottom: 1px solid rgba(255,255,255,0.12) !important;
-                    border-radius: 0 !important;
-                    padding: 0.5rem 0.3rem !important;
-                    font-size: 0.85rem;
-                    color: #fff !important;
-                    outline: none;
-                    transition: border-color 0.2s;
-                }
-
-                .consent-med-input:focus {
-                    border-bottom-color: var(--brand-primary, #ff6b2c) !important;
-                }
-
-                .consent-fecha-section {
-                    margin-bottom: 2rem;
-                    padding: 0 1.5rem;
-                }
-
-                .consent-fecha-text {
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    font-style: italic;
-                    opacity: 0.7;
-                }
-
-                .consent-firma-section {
+                .consent-firma-col {
+                    flex: 1.3;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    margin-bottom: 1.5rem;
+                    min-width: 240px;
+                }
+
+                .consent-fecha-col {
+                    flex: 0.7;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: flex-end;
+                    min-width: 140px;
+                }
+
+                .consent-fecha-value {
+                    font-size: 1rem;
+                    font-weight: 700;
+                    color: #fff;
+                    padding: 0.5rem 0;
+                    border-bottom: 1px solid rgba(255,255,255,0.15);
+                    width: 100%;
+                    text-align: center;
                 }
 
                 .consent-firma-canvas-wrap {

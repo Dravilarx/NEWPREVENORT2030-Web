@@ -81,6 +81,16 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                     observaciones: ex.observaciones || '',
                     ...extraFields
                 }
+
+                // Pre-llenar nombre y RUT en consentimientos
+                if (ex.prestaciones?.tipo_formulario === 'consentimiento' && atData) {
+                    if (!initialRes[ex.id].consent_nombre && atData.trabajadores?.nombre_completo) {
+                        initialRes[ex.id].consent_nombre = atData.trabajadores.nombre_completo
+                    }
+                    if (!initialRes[ex.id].consent_rut && atData.trabajadores?.rut) {
+                        initialRes[ex.id].consent_rut = atData.trabajadores.rut
+                    }
+                }
             })
             setResultados(initialRes)
         }
@@ -214,6 +224,16 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
         if (tipoForm === 'audiometria') {
             const hasHearingLoss = Object.keys(res).some(k => k.startsWith('audio_') && Number(res[k]) > 25)
             const summary = hasHearingLoss ? '⚠️ Requiere eval. especialista' : '✅ Audición Normal'
+            finalResultado = JSON.stringify({
+                ...extraFieldsToSave,
+                resultado: summary
+            })
+        }
+
+        // Si es Consentimiento
+        if (tipoForm === 'consentimiento') {
+            const firmado = res.consent_firma_data ? 'SÍ' : 'NO'
+            const summary = `Consentimiento ${firmado === 'SÍ' ? '✅ Firmado' : '⏳ Pendiente'} | ${res.consent_fecha || ''}`
             finalResultado = JSON.stringify({
                 ...extraFieldsToSave,
                 resultado: summary
@@ -507,6 +527,29 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                     color: #fff; 
                     min-height: 100vh;
                     background: #000;
+                }
+
+                /* ─── Override globals.css .card/.glass blancos ─── */
+                .evaluacion-detalle :global(.card) {
+                    background: rgba(10, 10, 10, 0.8) !important;
+                    border-color: rgba(255,255,255,0.08) !important;
+                }
+                .evaluacion-detalle :global(.glass) {
+                    background: rgba(10, 10, 10, 0.6) !important;
+                    border-color: rgba(255,255,255,0.08) !important;
+                }
+                .evaluacion-detalle :global(.card.glass) {
+                    background: rgba(10, 10, 10, 0.6) !important;
+                    border-color: rgba(255,255,255,0.08) !important;
+                }
+                /* Override para inputs/selects/textareas globales */
+                .evaluacion-detalle :global(input),
+                .evaluacion-detalle :global(select),
+                .evaluacion-detalle :global(textarea) {
+                    background: #111 !important;
+                    color: #fff !important;
+                    border: 1px solid rgba(255,255,255,0.1) !important;
+                    border-radius: 8px;
                 }
 
                 .page-header {
@@ -893,7 +936,8 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                     display: flex; 
                     justify-content: space-between; 
                     align-items: center; 
-                    background: rgba(255,255,255,0.02);
+                    background: rgba(10, 10, 10, 0.6) !important;
+                    border-color: rgba(255,255,255,0.08) !important;
                 }
 
                 .ai-status-column { position: sticky; top: 2rem; height: fit-content; }
@@ -934,9 +978,9 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                 .empty-state {
                     padding: 5rem 2rem;
                     text-align: center;
-                    background: rgba(255,255,255,0.01);
+                    background: rgba(10, 10, 10, 0.6) !important;
                     border-radius: 40px;
-                    border: 1px solid rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.05) !important;
                     margin-top: 2rem;
                     display: flex;
                     flex-direction: column;
