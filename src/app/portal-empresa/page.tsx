@@ -120,12 +120,108 @@ export default function PortalEmpresaPage() {
         reader.onload = async (e) => {
             const text = e.target?.result as string
             const lines = text.split('\n')
+            const header = lines[0].toLowerCase().replace(/\s/g, '')
+            const cols = header.split(',').map(c => c.trim())
 
-            const workersToRegister = lines.slice(1).filter(l => l.trim().length > 0).map(line => {
+            // Detect if CSV has rut_empresa column
+            const rutEmpresaIdx = cols.findIndex(c => ['rut_empresa', 'rutempresa', 'empresa_rut'].includes(c))
+            const rutIdx = cols.findIndex(c => c === 'rut')
+            const nomIdx = cols.findIndex(c => ['nombres', 'nombre'].includes(c))
+            const apPIdx = cols.findIndex(c => ['apellido_paterno', 'appaterno', 'ap_paterno'].includes(c))
+            const apMIdx = cols.findIndex(c => ['apellido_materno', 'apmaterno', 'ap_materno'].includes(c))
+            const emailIdx = cols.findIndex(c => c === 'email')
+            const fNacIdx = cols.findIndex(c => ['fecha_nacimiento', 'fechanac', 'fnac'].includes(c))
+            const sxIdx = cols.findIndex(c => c === 'sexo')
+            const cargoIdx = cols.findIndex(c => c === 'cargo')
+
+            const dataLines = lines.slice(1).filter(l => l.trim().length > 0)
+            if (dataLines.length === 0) {
+                alert('El archivo CSV no contiene datos.')
+                setLoading(false)
+                return
+            }
+
+            // Import normalizarRUT dynamically for RUT matching
+            const { normalizarRUT } = await import('@/lib/skills/formateadorRUT')
+
+            // Cache: RUT empresa normalizado -> empresa record
+            const empresaCache: Record<string, any> = {}
+            // Pre-load all empresas for matching
+            const { data: allEmpresas } = await supabase.from('empresas').select('*')
+            if (allEmpresas) {
+                allEmpresas.forEach(emp => {
+                    empresaCache[normalizarRUT(emp.rut_empresa)] = emp
+                })
+            }
+
+            // Pre-load all cargos for name matching
+            const { data: allCargos } = await supabase.from('cargos').select('id, nombre_cargo')
+
+            // Generate next empresa code helper
+            let maxCode = 0
+            if (allEmpresas) {
+                allEmpresas.forEach(emp => {
+                    if (emp.codigo) {
+                        const n = parseInt(emp.codigo.replace('EMP-', ''), 10)
+                        if (n > maxCode) maxCode = n
+                    }
+                })
+            }
+
+            let created = 0, updated = 0, atencionesCreated = 0, empresasCreated = 0
+            const errors: string[] = []
+
+            for (const line of dataLines) {
                 const parts = line.split(',').map(s => s.trim())
-                const [rut, nom, apP, apM, email, fNac, sx, cargo] = parts
-                return {
-                    rut: formatearRUT(rut),
+                const rut = rutIdx >= 0 ? formatearRUT(parts[rutIdx] || '') : ''
+                if (!rut) continue
+
+                const nom = nomIdx >= 0 ? parts[nomIdx] : ''
+                const apP = apPIdx >= 0 ? parts[apPIdx] : ''
+                const apM = apMIdx >= 0 ? parts[apMIdx] : ''
+                const email = emailIdx >= 0 ? parts[emailIdx] : null
+                const fNac = fNacIdx >= 0 ? parts[fNacIdx] : null
+                const sx = sxIdx >= 0 ? parts[sxIdx] : null
+                const cargoNombre = cargoIdx >= 0 ? parts[cargoIdx] : null
+
+                // 1. Determine empresa for this row
+                let empresaRecord: any = null
+                if (rutEmpresaIdx >= 0 && parts[rutEmpresaIdx]) {
+                    // CSV has empresa RUT — normalize and match
+                    const rutEmpNorm = normalizarRUT(parts[rutEmpresaIdx])
+                    if (empresaCache[rutEmpNorm]) {
+                        empresaRecord = empresaCache[rutEmpNorm]
+                    } else {
+                        // Auto-create empresa with this RUT
+                        maxCode++
+                        const newCodigo = 'EMP-' + String(maxCode).padStart(4, '0')
+                        const { data: newEmp, error: empErr } = await supabase.from('empresas').insert([{
+                            rut_empresa: rutEmpNorm,
+                            nombre: `Empresa ${rutEmpNorm}`,
+                            codigo: newCodigo,
+                            faenas: []
+                        }]).select().single()
+                        if (newEmp) {
+                            empresaCache[rutEmpNorm] = newEmp
+                            empresaRecord = newEmp
+                            empresasCreated++
+                        } else if (empErr) {
+                            errors.push(`Error creando empresa ${rutEmpNorm}: ${empErr.message}`)
+                        }
+                    }
+                } else if (empresaId) {
+                    // No empresa RUT in CSV — use the selected empresa
+                    empresaRecord = empresas.find(emp => emp.id === empresaId)
+                }
+
+                if (!empresaRecord) {
+                    errors.push(`Fila con RUT ${rut}: no se pudo determinar la empresa.`)
+                    continue
+                }
+
+                // 2. Upsert trabajador by RUT
+                const workerData: any = {
+                    rut: normalizarRUT(rut),
                     nombres: nom,
                     apellido_paterno: apP,
                     apellido_materno: apM,
@@ -133,23 +229,70 @@ export default function PortalEmpresaPage() {
                     email: email || null,
                     fecha_nacimiento: fNac || null,
                     sexo: sx || null,
-                    cargo: cargo || null
+                    cargo: cargoNombre || null
                 }
-            })
 
-            try {
-                const { error } = await supabase
+                const { data: workerResult, error: wErr } = await supabase
                     .from('trabajadores')
-                    .upsert(workersToRegister, { onConflict: 'rut' })
+                    .upsert(workerData, { onConflict: 'rut' })
+                    .select('id')
+                    .single()
 
-                if (error) throw error
-                alert(`¡Se han cargado ${workersToRegister.length} trabajadores exitosamente!`)
-                setBulkFile(null)
-            } catch (err: any) {
-                alert('Error en carga masiva: ' + err.message)
-            } finally {
-                setLoading(false)
+                if (wErr || !workerResult) {
+                    errors.push(`Error con trabajador ${rut}: ${wErr?.message || 'sin resultado'}`)
+                    continue
+                }
+
+                // 3. Match cargo by name (fuzzy)
+                let cargoId: string | null = null
+                if (cargoNombre && allCargos) {
+                    const cargoLower = cargoNombre.toLowerCase().trim()
+                    const match = allCargos.find(c => c.nombre_cargo.toLowerCase().trim() === cargoLower)
+                    if (match) cargoId = match.id
+                }
+
+                // 4. Check if there's already an active atencion for this worker+empresa
+                const { data: existingAt } = await supabase
+                    .from('atenciones')
+                    .select('id')
+                    .eq('trabajador_id', workerResult.id)
+                    .eq('empresa_id', empresaRecord.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+
+                if (existingAt) {
+                    updated++
+                } else {
+                    // 5. Create atencion (admission request)
+                    const { error: atErr } = await supabase.from('atenciones').insert([{
+                        trabajador_id: workerResult.id,
+                        empresa_id: empresaRecord.id,
+                        cargo_id: cargoId,
+                        estado_aptitud: 'pendiente'
+                    }])
+                    if (atErr) {
+                        errors.push(`Error creando atención para ${rut}: ${atErr.message}`)
+                    } else {
+                        atencionesCreated++
+                    }
+                }
+                created++
             }
+
+            // Summary
+            let summary = `✅ Carga completada:\n`
+            summary += `• ${created} trabajadores procesados\n`
+            summary += `• ${atencionesCreated} solicitudes de admisión creadas\n`
+            if (updated > 0) summary += `• ${updated} ya tenían atención activa\n`
+            if (empresasCreated > 0) summary += `• ${empresasCreated} empresas nuevas auto-creadas\n`
+            if (errors.length > 0) summary += `\n⚠️ ${errors.length} errores:\n${errors.slice(0, 5).join('\n')}`
+
+            alert(summary)
+            setBulkFile(null)
+            if (empresaId) fetchEmpresaData()
+            fetchEmpresas()
+            setLoading(false)
         }
         reader.readAsText(bulkFile)
     }
@@ -299,8 +442,8 @@ export default function PortalEmpresaPage() {
                             <div className="bulk-header">
                                 <h3>Pre-carga de Dotación</h3>
                             </div>
-                            <p className="bulk-text">Suba su nómina de trabajadores para agilizar el proceso de ingreso en centro médico.</p>
-                            <p className="bulk-text" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CSV: RUT, Nombres, ApPaterno, ApMaterno, Email, FechaNac, Sexo, Cargo.</p>
+                            <p className="bulk-text">Suba su nómina de trabajadores para agilizar el proceso de ingreso en centro médico. El sistema identifica la empresa automáticamente por RUT.</p>
+                            <p className="bulk-text" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CSV: RUT, Nombres, ApPaterno, ApMaterno, Email, FechaNac, Sexo, Cargo, <strong style={{ color: 'var(--brand-primary)' }}>RUT_Empresa</strong> (opcional).</p>
 
                             <div className="bulk-upload-zone">
                                 <input
@@ -332,6 +475,9 @@ export default function PortalEmpresaPage() {
                                 <li>Use RUT con puntos y guion.</li>
                                 <li>FechaNac en formato YYYY-MM-DD.</li>
                                 <li>Sexo: Masculino / Femenino.</li>
+                                <li><strong>RUT_Empresa</strong>: si el CSV lo incluye, el sistema identifica automáticamente la empresa. Si no, usa la empresa seleccionada arriba.</li>
+                                <li>Si la empresa no existe, se crea automáticamente con un código EMP-XXXX.</li>
+                                <li>Se crean las solicitudes de admisión por cada trabajador.</li>
                             </ul>
                         </div>
                     </div>

@@ -9,6 +9,7 @@ import { FORM_REGISTRY, DefaultForm } from '@/app/evaluacion/[id]/formularios'
 
 interface Empresa {
     id: string;
+    codigo: string;
     nombre: string;
     rut_empresa: string;
     giro?: string;
@@ -63,7 +64,23 @@ interface Bateria {
     nombre: string;
     descripcion?: string;
     bateria_items?: { prestacion_id: string }[];
+    prestacion_id: string;
+    empresa_id?: string;
+    cargo_id?: string;
+    riesgo_id?: string;
+    activa?: boolean;
 }
+
+interface Riesgo {
+    id: string;
+    nombre: string;
+    codigo: string;
+    grupo: string;
+    descripcion?: string;
+    activo: boolean;
+    orden: number;
+}
+
 
 interface PrestacionCategoria {
     id: string;
@@ -91,7 +108,7 @@ interface Toast {
 
 export default function ConfigPage() {
     const [activeTab, setActiveTab] = useState<'empresas' | 'protocolos'>('empresas')
-    const [protocolosView, setProtocolosView] = useState<'catalogo' | 'cargos' | 'baterias' | 'paneles' | 'categorias'>('catalogo')
+    const [protocolosView, setProtocolosView] = useState<'catalogo' | 'cargos' | 'baterias' | 'riesgos' | 'categorias'>('catalogo')
 
     // Worklist filter & sort states
     const [wlSearch, setWlSearch] = useState('')
@@ -143,12 +160,13 @@ export default function ConfigPage() {
     const [categorias, setCategorias] = useState<PrestacionCategoria[]>([])
     const [baterias, setBaterias] = useState<Bateria[]>([])
     const [paneles, setPaneles] = useState<PanelAssignment[]>([])
+    const [riesgos, setRiesgos] = useState<Riesgo[]>([])
     const [loading, setLoading] = useState(false)
 
     // --- Toast & Confirmation Modal State ---
     const [toasts, setToasts] = useState<Toast[]>([])
     const toastIdRef = useRef(0)
-    const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; nombre: string } | null>(null)
+    const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; nombre: string; type: 'prestacion' | 'cargo' | 'empresa' | 'bateria' | 'categoria' | 'panel' | 'riesgo'; warning: string } | null>(null)
 
     const [catSearch, setCatSearch] = useState('')
     const [catSortCol, setCatSortCol] = useState<'nombre' | 'prefijo'>('nombre')
@@ -323,6 +341,7 @@ export default function ConfigPage() {
 
     // Form states
     const [empresaForm, setEmpresaForm] = useState({
+        codigo: '',
         rut_empresa: '',
         nombre: '',
         giro: '',
@@ -361,8 +380,19 @@ export default function ConfigPage() {
     const [newBateria, setNewBateria] = useState({
         nombre: '',
         descripcion: '',
-        items: [] as string[]
+        items: [] as string[],
+        empresa_id: '' as string,
+        cargo_id: '' as string,
+        riesgo_id: '' as string
     })
+
+    const [newRiesgo, setNewRiesgo] = useState({
+        codigo: '',
+        nombre: '',
+        grupo: 'quimico'
+    })
+    const [showRiesgoPanel, setShowRiesgoPanel] = useState(false)
+    const [editingRiesgo, setEditingRiesgo] = useState<Riesgo | null>(null)
 
     useEffect(() => {
         fetchData()
@@ -485,6 +515,7 @@ export default function ConfigPage() {
         if (e) {
             setEditingEmpresa(e)
             setEmpresaForm({
+                codigo: e.codigo || '',
                 rut_empresa: e.rut_empresa,
                 nombre: e.nombre,
                 giro: e.giro || '',
@@ -496,7 +527,7 @@ export default function ConfigPage() {
             })
         } else {
             setEditingEmpresa(null)
-            setEmpresaForm({ rut_empresa: '', nombre: '', giro: '', direccion: '', email_contacto: '', nombre_contacto: '', telefono_contacto: '', faenas: [] })
+            setEmpresaForm({ codigo: '(se genera automáticamente)', rut_empresa: '', nombre: '', giro: '', direccion: '', email_contacto: '', nombre_contacto: '', telefono_contacto: '', faenas: [] })
         }
         setShowEmpresaPanel(true)
     }
@@ -523,15 +554,56 @@ export default function ConfigPage() {
             setNewBateria({
                 nombre: b.nombre,
                 descripcion: b.descripcion || '',
-                items: (b.bateria_items || []).map(i => i.prestacion_id)
+                items: (b.bateria_items || []).map((i: { prestacion_id: string }) => i.prestacion_id),
+                empresa_id: b.empresa_id || '',
+                cargo_id: b.cargo_id || '',
+                riesgo_id: b.riesgo_id || ''
             })
         } else {
             setEditingBateria(null)
-            setNewBateria({ nombre: '', descripcion: '', items: [] })
+            setNewBateria({ nombre: '', descripcion: '', items: [], empresa_id: '', cargo_id: '', riesgo_id: '' })
         }
         setShowBateriaPanel(true)
     }
     const closeBateriaPanel = () => { setShowBateriaPanel(false); setEditingBateria(null); }
+
+    const grupoPrefix: Record<string, string> = {
+        quimico: 'RQUI',
+        fisico: 'RFIS',
+        ergonomico: 'RERG',
+        altura_geografica: 'RAGEO',
+        altura_fisica: 'RAFIS',
+        biologico: 'RBIO',
+        psicosocial: 'RPSI'
+    }
+
+    const generarCodigoRiesgo = (grupo: string) => {
+        const prefix = grupoPrefix[grupo] || 'RGEN'
+        const existentes = riesgos.filter(r => r.codigo?.startsWith(prefix + '-')).length
+        const nextNum = (existentes + 1).toString().padStart(4, '0')
+        return `${prefix}-${nextNum}`
+    }
+
+    const openRiesgoPanel = (r?: Riesgo) => {
+        if (r) {
+            setEditingRiesgo(r)
+            setNewRiesgo({
+                codigo: r.codigo,
+                nombre: r.nombre,
+                grupo: r.grupo
+            })
+        } else {
+            setEditingRiesgo(null)
+            const grupo = 'quimico'
+            setNewRiesgo({
+                codigo: generarCodigoRiesgo(grupo),
+                nombre: '',
+                grupo
+            })
+        }
+        setShowRiesgoPanel(true)
+    }
+    const closeRiesgoPanel = () => { setShowRiesgoPanel(false); setEditingRiesgo(null); }
 
     async function fetchData() {
         setLoading(true)
@@ -541,6 +613,7 @@ export default function ConfigPage() {
         const { data: bat } = await supabase.from('baterias').select('*, bateria_items(prestacion_id)').order('nombre')
         const { data: ecb } = await supabase.from('empresa_cargo_baterias').select('*, empresas(nombre), cargos(nombre_cargo), baterias(nombre)')
         const { data: cat } = await supabase.from('prestacion_categorias').select('*').order('nombre')
+        const { data: rie } = await (supabase.from('riesgos') as any).select('*').order('orden')
 
         if (emp) setEmpresas(emp)
         if (car) setCargos(car)
@@ -548,59 +621,133 @@ export default function ConfigPage() {
         if (bat) setBaterias(bat)
         if (ecb) setPaneles(ecb)
         if (cat) setCategorias(cat)
+        if (rie) setRiesgos(rie)
         setLoading(false)
+    }
+
+    async function generateEmpresaCodigo(): Promise<string> {
+        const { data } = await supabase.from('empresas').select('codigo').order('codigo', { ascending: false }).limit(1);
+        if (data && data.length > 0 && data[0].codigo) {
+            const num = parseInt(data[0].codigo.replace('EMP-', ''), 10);
+            return 'EMP-' + String(num + 1).padStart(4, '0');
+        }
+        return 'EMP-0001';
     }
 
     async function saveEmpresa() {
         if (!empresaForm.nombre || !empresaForm.rut_empresa) {
-            alert('Nombre y RUT son obligatorios')
-            return
+            showToast('Nombre y RUT son obligatorios', 'warning');
+            return;
         }
 
-        let error;
-        let empresaId = editingEmpresa?.id;
+        const rutNormalizado = normalizarRUT(empresaForm.rut_empresa);
+        const payload: any = {
+            rut_empresa: rutNormalizado,
+            nombre: empresaForm.nombre,
+            giro: empresaForm.giro,
+            direccion: empresaForm.direccion,
+            email_contacto: empresaForm.email_contacto,
+            nombre_contacto: empresaForm.nombre_contacto,
+            telefono_contacto: empresaForm.telefono_contacto,
+            faenas: empresaForm.faenas
+        };
+
         if (editingEmpresa) {
-            const { error: err } = await supabase.from('empresas').update({
-                rut_empresa: empresaForm.rut_empresa,
-                nombre: empresaForm.nombre,
-                giro: empresaForm.giro,
-                direccion: empresaForm.direccion,
-                email_contacto: empresaForm.email_contacto,
-                nombre_contacto: empresaForm.nombre_contacto,
-                telefono_contacto: empresaForm.telefono_contacto,
-                faenas: empresaForm.faenas
-            }).eq('id', editingEmpresa.id)
-            error = err
+            // Updating existing empresa
+            const { error } = await supabase.from('empresas').update(payload).eq('id', editingEmpresa.id);
+            if (error) {
+                if (error.message.includes('empresas_rut_empresa_unique')) {
+                    showToast('Ya existe otra empresa con ese RUT. El RUT es el identificador único.', 'error');
+                } else {
+                    showToast('Error: ' + error.message, 'error');
+                }
+                return;
+            }
+            showToast('Empresa actualizada correctamente', 'success');
         } else {
-            const { data, error: err } = await supabase.from('empresas').insert([{
-                rut_empresa: empresaForm.rut_empresa,
-                nombre: empresaForm.nombre,
-                giro: empresaForm.giro,
-                direccion: empresaForm.direccion,
-                email_contacto: empresaForm.email_contacto,
-                nombre_contacto: empresaForm.nombre_contacto,
-                telefono_contacto: empresaForm.telefono_contacto,
-                faenas: empresaForm.faenas
-            }]).select()
-            error = err
-            if (data) empresaId = data[0].id
+            // Check if RUT already exists — if so, update that empresa instead of duplicating
+            const { data: existing } = await supabase.from('empresas').select('id, nombre, codigo').eq('rut_empresa', rutNormalizado).maybeSingle();
+            if (existing) {
+                // RUT already exists — update the existing empresa with new data
+                const { error } = await supabase.from('empresas').update(payload).eq('id', existing.id);
+                if (error) {
+                    showToast('Error al actualizar empresa existente: ' + error.message, 'error');
+                    return;
+                }
+                showToast(`RUT ya registrado como "${existing.nombre}" (${existing.codigo}). Datos actualizados.`, 'info');
+            } else {
+                // New empresa — generate code
+                const codigo = await generateEmpresaCodigo();
+                payload.codigo = codigo;
+                const { error } = await supabase.from('empresas').insert([payload]);
+                if (error) {
+                    showToast('Error: ' + error.message, 'error');
+                    return;
+                }
+                showToast(`Empresa creada con código ${codigo}`, 'success');
+            }
         }
 
-        if (error) {
-            console.error(error)
-            alert('Error: ' + error.message)
-            return
-        }
-
-        closeEmpresaPanel()
-        fetchData()
+        closeEmpresaPanel();
+        fetchData();
     }
 
-    async function deleteEmpresa(id: string) {
-        if (!confirm('¿Eliminar esta empresa? Se perderán sus vínculos con cargos y baterías.')) return;
-        const { error } = await supabase.from('empresas').delete().eq('id', id);
-        if (error) alert('Error: ' + error.message);
-        fetchData();
+    function requestDelete(id: string, nombre: string, type: 'prestacion' | 'cargo' | 'empresa' | 'bateria' | 'categoria' | 'panel' | 'riesgo', warning?: string) {
+        const defaultWarnings: Record<string, string> = {
+            prestacion: 'Esta acción no se puede deshacer y fallará si el examen está en una batería activa.',
+            cargo: 'Esta acción fallará si el cargo está asignado a una empresa en Paneles.',
+            empresa: 'Se perderán sus vínculos con cargos y baterías.',
+            bateria: 'Esta acción fallará si la batería está asignada en Paneles.',
+            categoria: 'Fallará si hay exámenes asociados a esta categoría.',
+            panel: 'Se eliminará esta asignación de evaluación.',
+            riesgo: 'Se perderán las vinculaciones con baterías y cargos asociados.',
+        };
+        setDeleteConfirm({ id, nombre, type, warning: warning || defaultWarnings[type] || 'Esta acción no se puede deshacer.' });
+    }
+
+    async function executeDelete() {
+        if (!deleteConfirm) return;
+        const { id, type } = deleteConfirm;
+        setDeleteConfirm(null);
+
+        const tableMap: Record<string, string> = {
+            prestacion: 'prestaciones',
+            cargo: 'cargos',
+            empresa: 'empresas',
+            bateria: 'baterias',
+            categoria: 'prestacion_categorias',
+            panel: 'empresa_cargo_baterias',
+            riesgo: 'riesgos',
+        };
+        const labelMap: Record<string, string> = {
+            prestacion: 'Prestación',
+            cargo: 'Cargo',
+            empresa: 'Empresa',
+            bateria: 'Batería',
+            categoria: 'Categoría',
+            panel: 'Panel',
+            riesgo: 'Riesgo',
+        };
+
+        try {
+            const { error } = await supabase.from(tableMap[type]).delete().eq('id', id);
+            if (error) {
+                if (error.code === '23503') {
+                    showToast(`No se puede eliminar: ${labelMap[type]} está en uso. Elimine las dependencias primero.`, 'error');
+                } else {
+                    showToast(`Error al eliminar: ${error.message}`, 'error');
+                }
+                return;
+            }
+            showToast(`${labelMap[type]} eliminado/a correctamente.`, 'success');
+            await fetchData();
+        } catch (err: any) {
+            showToast('Error crítico: ' + (err.message || 'Error desconocido'), 'error');
+        }
+    }
+
+    function deleteEmpresa(id: string, nombre: string = 'esta empresa') {
+        requestDelete(id, nombre, 'empresa');
     }
 
     const addFaenaToLocal = () => {
@@ -645,24 +792,18 @@ export default function ConfigPage() {
         }
 
         if (error) {
-            alert('Error: ' + error.message)
+            showToast('Error: ' + error.message, 'error')
             return
         }
 
+        showToast(editingCargo ? 'Cargo actualizado correctamente' : 'Cargo creado correctamente', 'success');
         closeCargoPanel()
         fetchData()
     }
 
-    async function deleteCargo(id: string) {
+    function deleteCargo(id: string, nombre: string = 'este cargo') {
         if (!id) return;
-        if (!confirm('¿Eliminar este cargo maestro? Esta acción fallará si el cargo está asignado a una empresa.')) return;
-        const { error } = await supabase.from('cargos').delete().eq('id', id);
-        if (error) {
-            if (error.code === '23503') alert('No se puede eliminar: El cargo está asignado en la sección de "Paneles". Elimine la asignación primero.');
-            else alert('Error: ' + error.message);
-            return;
-        }
-        fetchData();
+        requestDelete(id, nombre, 'cargo');
     }
 
     const openCategoriaPanel = (c?: PrestacionCategoria) => {
@@ -705,14 +846,8 @@ export default function ConfigPage() {
         fetchData();
     }
 
-    async function deleteCategoria(id: string) {
-        if (!confirm('¿Eliminar esta categoría? Fallará si hay exámenes asociados.')) return;
-        const { error } = await supabase.from('prestacion_categorias').delete().eq('id', id);
-        if (error) {
-            alert('Error: ' + error.message);
-            return;
-        }
-        fetchData();
+    function deleteCategoria(id: string, nombre: string = 'esta categoría') {
+        requestDelete(id, nombre, 'categoria');
     }
 
     async function savePrestacion() {
@@ -748,83 +883,80 @@ export default function ConfigPage() {
 
     // Opens the confirmation modal instead of using native confirm()
     function requestDeletePrestacion(id: string, nombre: string) {
-        setDeleteConfirm({ id, nombre });
-    }
-
-    // Actually performs the delete after user confirms via modal
-    async function executeDeletePrestacion() {
-        if (!deleteConfirm) return;
-        const { id } = deleteConfirm;
-        setDeleteConfirm(null);
-
-        try {
-            const { error } = await supabase.from('prestaciones').delete().eq('id', id);
-
-            if (error) {
-                if (error.code === '23503') {
-                    showToast('No se puede eliminar: El examen está siendo usado en baterías o atenciones activas.', 'error');
-                } else {
-                    showToast(`Error al eliminar: ${error.message}`, 'error');
-                }
-                return;
-            }
-
-            showToast('Prestación eliminada correctamente.', 'success');
-            await fetchData();
-        } catch (err: any) {
-            showToast('Error crítico: ' + (err.message || 'Error desconocido'), 'error');
-        }
+        requestDelete(id, nombre, 'prestacion');
     }
 
     async function saveBateria() {
         if (!newBateria.nombre || newBateria.items.length === 0) {
-            alert('Nombre y al menos una prestación son obligatorios');
+            showToast('Nombre y al menos una prestación son obligatorios', 'warning');
             return;
         }
 
         let batteryId;
+        const bateriaPayload: any = {
+            nombre: newBateria.nombre,
+            descripcion: newBateria.descripcion,
+            activa: true,
+            empresa_id: newBateria.empresa_id || null,
+            cargo_id: newBateria.cargo_id || null,
+            riesgo_id: newBateria.riesgo_id || null
+        };
+
         if (editingBateria) {
             batteryId = editingBateria.id;
-            const { error } = await supabase.from('baterias').update({
-                nombre: newBateria.nombre,
-                descripcion: newBateria.descripcion
-            }).eq('id', batteryId);
-
-            if (error) { alert('Error: ' + error.message); return; }
-
+            const { error } = await supabase.from('baterias').update(bateriaPayload).eq('id', batteryId);
+            if (error) { showToast('Error: ' + error.message, 'error'); return; }
             // Borrar items antiguos
             await supabase.from('bateria_items').delete().eq('bateria_id', batteryId);
         } else {
-            const { data, error } = await supabase.from('baterias').insert([{
-                nombre: newBateria.nombre,
-                descripcion: newBateria.descripcion
-            }]).select();
-
-            if (error) { alert('Error: ' + error.message); return; }
+            const { data, error } = await supabase.from('baterias').insert([bateriaPayload]).select();
+            if (error) { showToast('Error: ' + error.message, 'error'); return; }
             batteryId = data[0].id;
         }
 
-        // Insertar items (nuevos o actualizados)
+        // Insertar items
         const items = newBateria.items.map(p_id => ({
             bateria_id: batteryId,
             prestacion_id: p_id
         }));
         await supabase.from('bateria_items').insert(items);
 
+        showToast(editingBateria ? 'Batería actualizada correctamente' : 'Batería creada correctamente', 'success');
         closeBateriaPanel();
         fetchData();
     }
 
-    async function deleteBateria(id: string) {
-        if (!id) return;
-        if (!confirm('¿Eliminar esta batería de exámenes? Esta acción fallará si la batería está asignada a una empresa.')) return;
-        const { error } = await supabase.from('baterias').delete().eq('id', id);
-        if (error) {
-            if (error.code === '23503') alert('No se puede eliminar: Esta batería está asignada en la sección de "Paneles". Elimine la asignación primero.');
-            else alert('Error: ' + error.message);
+    async function saveRiesgo() {
+        if (!newRiesgo.codigo || !newRiesgo.nombre) {
+            showToast('Código y Nombre son obligatorios', 'warning');
             return;
         }
+
+        const payload = {
+            codigo: newRiesgo.codigo,
+            nombre: newRiesgo.nombre,
+            grupo: newRiesgo.grupo,
+            activo: true,
+            orden: 0
+        };
+
+        if (editingRiesgo) {
+            const { error } = await (supabase.from('riesgos') as any).update(payload).eq('id', editingRiesgo.id);
+            if (error) { showToast('Error: ' + error.message, 'error'); return; }
+            showToast('Riesgo actualizado correctamente', 'success');
+        } else {
+            const { error } = await (supabase.from('riesgos') as any).insert([payload]);
+            if (error) { showToast('Error: ' + error.message, 'error'); return; }
+            showToast('Riesgo creado correctamente', 'success');
+        }
+
+        closeRiesgoPanel();
         fetchData();
+    }
+
+    function deleteBateria(id: string, nombre: string = 'esta batería') {
+        if (!id) return;
+        requestDelete(id, nombre, 'bateria');
     }
 
     async function assignBateria() {
@@ -890,6 +1022,11 @@ export default function ConfigPage() {
                                 <p className="section-hint">Gestiona los datos maestros de la empresa y sus faenas operativas.</p>
 
                                 <div className="add-form vertical mt-4" style={{ overflowY: 'auto', flex: 1, paddingRight: '0.8rem' }}>
+                                    {/* Código automático */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,107,44,0.08)', border: '1px solid rgba(255,107,44,0.2)' }}>
+                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Código</span>
+                                        <span style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: 700, color: 'var(--brand-primary)', letterSpacing: '1px' }}>{empresaForm.codigo || '(automático)'}</span>
+                                    </div>
                                     <div className="form-group">
                                         <label>Nombre Empresa</label>
                                         <input
@@ -1061,6 +1198,7 @@ export default function ConfigPage() {
                                 <table className="wl-table">
                                     <thead>
                                         <tr>
+                                            <th style={{ width: '90px' }}>Código</th>
                                             <th onClick={() => {
                                                 if (empSortCol === 'nombre') setEmpSortDir(d => d === 'asc' ? 'desc' : 'asc');
                                                 else { setEmpSortCol('nombre'); setEmpSortDir('asc'); }
@@ -1085,9 +1223,12 @@ export default function ConfigPage() {
                                     </thead>
                                     <tbody>
                                         {filteredEmpresas.length === 0 ? (
-                                            <tr><td colSpan={5} className="wl-empty">No se encontraron empresas con los filtros aplicados.</td></tr>
+                                            <tr><td colSpan={6} className="wl-empty">No se encontraron empresas con los filtros aplicados.</td></tr>
                                         ) : filteredEmpresas.map(e => (
                                             <tr key={e.id} className="wl-row" onClick={() => openEmpresaPanel(e)}>
+                                                <td>
+                                                    <span className="wl-code" style={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--brand-primary)' }}>{e.codigo}</span>
+                                                </td>
                                                 <td>
                                                     <div style={{ fontWeight: 700 }}>{e.nombre}</div>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{e.giro || '—'}</div>
@@ -1105,7 +1246,7 @@ export default function ConfigPage() {
                                                 <td>
                                                     <div className="wl-actions" style={{ justifyContent: 'flex-end' }}>
                                                         <button className="btn-icon-sq edit" onClick={(ev) => { ev.stopPropagation(); openEmpresaPanel(e); }}>✏️</button>
-                                                        <button className="btn-icon-sq delete" onClick={(ev) => { ev.stopPropagation(); deleteEmpresa(e.id); }}>🗑️</button>
+                                                        <button className="btn-icon-sq delete" onClick={(ev) => { ev.stopPropagation(); deleteEmpresa(e.id, e.nombre); }}>🗑️</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1121,10 +1262,11 @@ export default function ConfigPage() {
                                     <div key={e.id} className="card-item interactive-card animate-fade" onClick={() => openEmpresaPanel(e)}>
                                         <div className="card-actions-top">
                                             <button className="btn-icon-sq edit" onClick={(ev) => { ev.stopPropagation(); openEmpresaPanel(e); }}>✏️</button>
-                                            <button className="btn-icon-sq delete" onClick={(ev) => { ev.stopPropagation(); deleteEmpresa(e.id); }}>🗑️</button>
+                                            <button className="btn-icon-sq delete" onClick={(ev) => { ev.stopPropagation(); deleteEmpresa(e.id, e.nombre); }}>🗑️</button>
                                         </div>
                                         <div className="card-header">
                                             <h5>{e.nombre}</h5>
+                                            <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-primary)', marginTop: '2px' }}>{e.codigo}</span>
                                         </div>
                                         <div style={{ marginBottom: '1.2rem' }}>
                                             <span className="wl-code">{e.rut_empresa}</span>
@@ -1174,10 +1316,10 @@ export default function ConfigPage() {
                                 📦 Baterías
                             </button>
                             <button
-                                className={`sub-tab-btn ${protocolosView === 'paneles' ? 'active' : ''}`}
-                                onClick={() => setProtocolosView('paneles')}
+                                className={`sub-tab-btn ${protocolosView === 'riesgos' ? 'active' : ''}`}
+                                onClick={() => setProtocolosView('riesgos')}
                             >
-                                🗺️ Paneles
+                                ⚠️ Riesgos
                             </button>
                             <button
                                 className={`sub-tab-btn ${protocolosView === 'categorias' ? 'active' : ''}`}
@@ -1585,6 +1727,53 @@ export default function ConfigPage() {
                                                 />
                                             </div>
 
+                                            {/* === ASIGNACIÓN DIRECTA === */}
+                                            <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                🔗 Asignación
+                                            </div>
+                                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                                                Asocia esta batería a una empresa, cargo y/o riesgo.
+                                            </p>
+
+                                            <div className="form-group">
+                                                <label>🏢 Empresa</label>
+                                                <select
+                                                    value={newBateria.empresa_id}
+                                                    onChange={e => setNewBateria({ ...newBateria, empresa_id: e.target.value })}
+                                                >
+                                                    <option value="">— Todas las empresas —</option>
+                                                    {empresas.map(emp => (
+                                                        <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label>👷 Cargo</label>
+                                                <select
+                                                    value={newBateria.cargo_id}
+                                                    onChange={e => setNewBateria({ ...newBateria, cargo_id: e.target.value })}
+                                                >
+                                                    <option value="">— Todos los cargos —</option>
+                                                    {cargos.map(c => (
+                                                        <option key={c.id} value={c.id}>{c.nombre_cargo}{c.es_gran_altura ? ' 🏔️' : ''}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label>⚠️ Riesgo</label>
+                                                <select
+                                                    value={newBateria.riesgo_id}
+                                                    onChange={e => setNewBateria({ ...newBateria, riesgo_id: e.target.value })}
+                                                >
+                                                    <option value="">— Sin riesgo específico —</option>
+                                                    {riesgos.map(r => (
+                                                        <option key={r.id} value={r.id}>{r.codigo} — {r.nombre}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
                                             <div className="flex-fill" style={{ marginTop: '1.5rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', minHeight: '0' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
                                                     <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--brand-primary)' }}>Selección de Prestaciones</label>
@@ -1690,17 +1879,26 @@ export default function ConfigPage() {
                                                     }} style={{ cursor: 'pointer' }}>
                                                         Descripción {bateriaSortCol === 'descripcion' && (bateriaSortDir === 'asc' ? '↑' : '↓')}
                                                     </th>
+                                                    <th style={{ textAlign: 'center' }}>Criterio</th>
                                                     <th style={{ textAlign: 'center' }}>Prestaciones</th>
                                                     <th style={{ textAlign: 'right' }}>Acciones</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {filteredBaterias.length === 0 ? (
-                                                    <tr><td colSpan={4} className="wl-empty">No se encontraron baterías con los filtros aplicados.</td></tr>
+                                                    <tr><td colSpan={5} className="wl-empty">No se encontraron baterías con los filtros aplicados.</td></tr>
                                                 ) : filteredBaterias.map(b => (
                                                     <tr key={b.id} className="wl-row" onClick={() => openBateriaPanel(b)}>
                                                         <td><strong>{b.nombre}</strong></td>
                                                         <td><div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{b.descripcion || '—'}</div></td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                                                {b.empresa_id && <span className="badge-mini" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', fontSize: '0.7rem' }}>🏢 {empresas.find(e => e.id === b.empresa_id)?.nombre || 'Empresa'}</span>}
+                                                                {b.cargo_id && <span className="badge-mini" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', fontSize: '0.7rem' }}>👷 {cargos.find(c => c.id === b.cargo_id)?.nombre_cargo || 'Cargo'}</span>}
+                                                                {b.riesgo_id && <span className="badge-mini" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', fontSize: '0.7rem' }}>⚠️ {riesgos.find(r => r.id === b.riesgo_id)?.codigo || 'Riesgo'}</span>}
+                                                                {!b.empresa_id && !b.cargo_id && !b.riesgo_id && <span className="badge-mini" style={{ background: 'rgba(100,116,139,0.1)', color: '#64748b', fontSize: '0.7rem' }}>📋 General</span>}
+                                                            </div>
+                                                        </td>
                                                         <td style={{ textAlign: 'center' }}>
                                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
                                                                 {b.bateria_items?.slice(0, 4).map(bi => {
@@ -1713,7 +1911,7 @@ export default function ConfigPage() {
                                                         <td>
                                                             <div className="wl-actions" style={{ justifyContent: 'flex-end' }}>
                                                                 <button className="btn-icon-sq edit" onClick={(e) => { e.stopPropagation(); openBateriaPanel(b); }}>✏️</button>
-                                                                <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteBateria(b.id); }}>🗑️</button>
+                                                                <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteBateria(b.id, b.nombre); }}>🗑️</button>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1729,10 +1927,16 @@ export default function ConfigPage() {
                                             <div key={b.id} className="card-item interactive-card animate-fade" onClick={() => openBateriaPanel(b)}>
                                                 <div className="card-actions-top">
                                                     <button className="btn-icon-sq edit" onClick={(e) => { e.stopPropagation(); openBateriaPanel(b); }}>✏️</button>
-                                                    <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteBateria(b.id); }}>🗑️</button>
+                                                    <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteBateria(b.id, b.nombre); }}>🗑️</button>
                                                 </div>
                                                 <div className="card-header">
                                                     <h5>{b.nombre}</h5>
+                                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                                        {b.empresa_id && <span className="badge-mini" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', fontSize: '0.65rem' }}>🏢 {empresas.find(e => e.id === b.empresa_id)?.nombre || 'Empresa'}</span>}
+                                                        {b.cargo_id && <span className="badge-mini" style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1', fontSize: '0.65rem' }}>👷 {cargos.find(c => c.id === b.cargo_id)?.nombre_cargo || 'Cargo'}</span>}
+                                                        {b.riesgo_id && <span className="badge-mini" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: '0.65rem' }}>⚠️ {riesgos.find(r => r.id === b.riesgo_id)?.codigo || 'Riesgo'}</span>}
+                                                        {!b.empresa_id && !b.cargo_id && !b.riesgo_id && <span className="badge-mini" style={{ background: 'rgba(100,116,139,0.15)', color: '#64748b', fontSize: '0.65rem' }}>📋 General</span>}
+                                                    </div>
                                                 </div>
                                                 <p className="card-desc" style={{ marginBottom: '1.5rem' }}>{b.descripcion || 'Sin descripción.'}</p>
 
@@ -1825,6 +2029,7 @@ export default function ConfigPage() {
                                                 />
                                             </div>
 
+
                                             <button className="btn btn-primary mt-8 full-width" onClick={saveCargo}>
                                                 {editingCargo ? 'Guardar Cambios' : 'Registrar Cargo'}
                                             </button>
@@ -1910,7 +2115,7 @@ export default function ConfigPage() {
                                                         <td>
                                                             <div className="wl-actions" style={{ justifyContent: 'flex-end' }}>
                                                                 <button className="btn-icon-sq edit" onClick={(e) => { e.stopPropagation(); openCargoPanel(c); }}>✏️</button>
-                                                                <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteCargo(c.id); }}>🗑️</button>
+                                                                <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteCargo(c.id, c.nombre_cargo); }}>🗑️</button>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1926,7 +2131,7 @@ export default function ConfigPage() {
                                             <div key={c.id} className="card-item interactive-card animate-fade" onClick={() => openCargoPanel(c)}>
                                                 <div className="card-actions-top">
                                                     <button className="btn-icon-sq edit" onClick={(e) => { e.stopPropagation(); openCargoPanel(c); }}>✏️</button>
-                                                    <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteCargo(c.id); }}>🗑️</button>
+                                                    <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteCargo(c.id, c.nombre_cargo); }}>🗑️</button>
                                                 </div>
                                                 <div className="card-header">
                                                     <h5>{c.nombre_cargo}</h5>
@@ -1956,137 +2161,146 @@ export default function ConfigPage() {
                             </>
                         )}
 
-                        {protocolosView === 'paneles' && (
+                        {protocolosView === 'riesgos' && (
                             <>
+                                {/* Panel Lateral para Riesgos */}
+                                <div className={`side-panel ${showRiesgoPanel ? 'open' : ''}`}>
+                                    <div className="side-panel-overlay" onClick={closeRiesgoPanel}></div>
+                                    <div className="side-panel-content">
+                                        <div className="side-panel-header">
+                                            <h3>{editingRiesgo ? '✏️ Editar Riesgo' : '⚠️ Nuevo Riesgo'}</h3>
+                                            <button className="btn-close" onClick={closeRiesgoPanel}>&times;</button>
+                                        </div>
+                                        <p className="section-hint">Define factores de riesgo para automatizar la asignación de baterías.</p>
+
+                                        <div className="add-form vertical mt-4">
+                                            <div className="form-group">
+                                                <label>Código del Riesgo (Automático)</label>
+                                                <input
+                                                    type="text"
+                                                    disabled
+                                                    style={{ background: 'rgba(255,107,44,0.05)', cursor: 'not-allowed', color: 'var(--text-muted)' }}
+                                                    value={newRiesgo.codigo}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Nombre del Riesgo</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ej: Sílice Libre Cristalizada"
+                                                    value={newRiesgo.nombre}
+                                                    onChange={e => setNewRiesgo({ ...newRiesgo, nombre: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Grupo / Categoría</label>
+                                                <select
+                                                    value={newRiesgo.grupo}
+                                                    onChange={e => {
+                                                        const nuevoGrupo = e.target.value;
+                                                        setNewRiesgo({
+                                                            ...newRiesgo,
+                                                            grupo: nuevoGrupo as any,
+                                                            codigo: editingRiesgo ? newRiesgo.codigo : generarCodigoRiesgo(nuevoGrupo)
+                                                        })
+                                                    }}
+                                                >
+                                                    <option value="quimico">🧪 Químico</option>
+                                                    <option value="fisico">🔊 Físico</option>
+                                                    <option value="ergonomico">🏋️ Ergonómico</option>
+                                                    <option value="altura_geografica">🏔️ Altura Geográfica</option>
+                                                    <option value="altura_fisica">🪜 Altura Física</option>
+                                                    <option value="biologico">🦠 Biológico</option>
+                                                    <option value="psicosocial">🧠 Psicosocial</option>
+                                                </select>
+                                            </div>
+                                            <button className="btn btn-primary mt-6 full-width" onClick={saveRiesgo}>
+                                                {editingRiesgo ? 'Guardar Cambios' : 'Crear Riesgo'}
+                                            </button>
+
+                                            {editingRiesgo && (
+                                                <button
+                                                    className="btn btn-outline mt-2 full-width"
+                                                    style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                                                    onClick={() => requestDelete(editingRiesgo.id, editingRiesgo.nombre, 'riesgo')}
+                                                >
+                                                    Eliminar Riesgo
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="wl-header">
                                     <div className="wl-header-left">
-                                        <h4>🖇️ Paneles de Evaluación Activos</h4>
-                                        <p className="wl-subtitle">Protocolos finales asignados (Empresa + Cargo = Batería).</p>
+                                        <h4>⚠️ Catálogo de Riesgos Ocupacionales</h4>
+                                        <p className="wl-subtitle">Factores de riesgo que determinan qué baterías se aplican automáticamente.</p>
+                                    </div>
+                                    <div className="wl-header-actions">
+                                        <button className="btn btn-primary" onClick={() => openRiesgoPanel()}>+ Nuevo Riesgo</button>
                                     </div>
                                 </div>
 
-                                <div className="assignment-form-row card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'flex-end', background: 'rgba(255,107,44,0.03)', padding: '1.5rem', borderRadius: '14px', border: '1px solid rgba(255,107,44,0.2)', marginBottom: '2rem' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label>Empresa</label>
-                                        <select value={assignmentForm.empresa_id} onChange={e => setAssignmentForm({ ...assignmentForm, empresa_id: e.target.value, faena_nombre: '' })}>
-                                            <option value="">Seleccione Empresa...</option>
-                                            {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label>Faena</label>
-                                        <select
-                                            value={assignmentForm.faena_nombre}
-                                            onChange={e => setAssignmentForm({ ...assignmentForm, faena_nombre: e.target.value })}
-                                            disabled={!assignmentForm.empresa_id}
-                                        >
-                                            <option value="">Seleccione Faena...</option>
-                                            {empresas.find(e => e.id === assignmentForm.empresa_id)?.faenas?.map((f, idx) => (
-                                                <option key={idx} value={f.nombre_faena}>{f.nombre_faena}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label>Cargo Postulante</label>
-                                        <select value={assignmentForm.cargo_id} onChange={e => setAssignmentForm({ ...assignmentForm, cargo_id: e.target.value })}>
-                                            <option value="">Seleccione Cargo...</option>
-                                            {cargos.map(c => <option key={c.id} value={c.id}>{c.nombre_cargo}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label>Batería / Protocolo</label>
-                                        <select value={assignmentForm.bateria_id} onChange={e => setAssignmentForm({ ...assignmentForm, bateria_id: e.target.value })}>
-                                            <option value="">Seleccione Batería...</option>
-                                            {baterias.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-                                        </select>
-                                    </div>
-                                    <button className="btn btn-primary" style={{ height: '42px' }} onClick={async () => {
-                                        if (!assignmentForm.empresa_id || !assignmentForm.cargo_id || !assignmentForm.bateria_id || !assignmentForm.faena_nombre) return
-                                        const { error } = await supabase.from('empresa_cargo_baterias').insert([{
-                                            empresa_id: assignmentForm.empresa_id,
-                                            faena_nombre: assignmentForm.faena_nombre,
-                                            cargo_id: assignmentForm.cargo_id,
-                                            bateria_id: assignmentForm.bateria_id
-                                        }])
-                                        if (error) alert(error.message)
-                                        fetchData()
-                                        setAssignmentForm({ empresa_id: '', faena_nombre: '', cargo_id: '', bateria_id: '' })
-                                    }}>
-                                        + ASIGNAR
-                                    </button>
-                                </div>
+                                {(() => {
+                                    const gruposOrder = ['quimico', 'fisico', 'ergonomico', 'altura', 'biologico', 'psicosocial'];
+                                    const gruposPresentes = [...new Set(riesgos.map(r => r.grupo))].sort((a, b) => {
+                                        return gruposOrder.indexOf(a) - gruposOrder.indexOf(b);
+                                    });
 
-                                <div className="wl-controls card">
-                                    <div className="wl-search-wrapper">
-                                        <span className="wl-search-icon">🔍</span>
-                                        <input
-                                            type="text"
-                                            className="wl-search-input"
-                                            placeholder="Buscar por empresa, cargo o batería..."
-                                            value={panelSearch}
-                                            onChange={e => setPanelSearch(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
+                                    return gruposPresentes.map(grupo => (
+                                        <div key={grupo} className="card" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+                                            <h5 style={{ marginBottom: '1rem', color: 'var(--brand-primary)', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '1px' }}>
+                                                {grupo === 'quimico' ? '🧪 Químico' :
+                                                    grupo === 'fisico' ? '🔊 Físico' :
+                                                        grupo === 'ergonomico' ? '🏋️ Ergonómico' :
+                                                            grupo === 'altura_geografica' ? '🏔️ Altura Geográfica' :
+                                                                grupo === 'altura_fisica' ? '🪜 Altura Física' :
+                                                                    grupo === 'biologico' ? '🦠 Biológico' :
+                                                                        grupo === 'psicosocial' ? '🧠 Psicosocial' :
+                                                                            `📋 ${grupo}`}
+                                            </h5>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                {riesgos.filter(r => r.grupo === grupo).sort((a, b) => (a.orden || 0) - (b.orden || 0)).map(r => {
+                                                    const bateriasAsociadas = baterias.filter(b => b.riesgo_id === r.id).length
+                                                    return (
+                                                        <div key={r.id}
+                                                            onClick={() => openRiesgoPanel(r)}
+                                                            className="interactive-item"
+                                                            style={{
+                                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                                padding: '8px 14px', borderRadius: '10px',
+                                                                background: r.activo ? 'rgba(255,107,44,0.08)' : 'rgba(100,116,139,0.08)',
+                                                                border: `1px solid ${r.activo ? 'rgba(255,107,44,0.25)' : 'rgba(100,116,139,0.2)'}`,
+                                                                opacity: r.activo ? 1 : 0.5,
+                                                                transition: 'all 0.2s ease',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            <span style={{ fontWeight: 600, fontSize: '0.85rem', color: r.activo ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                                                {r.codigo}
+                                                            </span>
+                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>—</span>
+                                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{r.nombre}</span>
+                                                            {bateriasAsociadas > 0 && (
+                                                                <span className="badge-mini" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', fontSize: '0.7rem' }}>
+                                                                    📦 {bateriasAsociadas}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))
+                                })()}
 
-                                <div className="wl-table-wrapper card">
-                                    <table className="wl-table">
-                                        <thead>
-                                            <tr>
-                                                <th onClick={() => {
-                                                    if (panelSortCol === 'empresa') setPanelSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                                                    else { setPanelSortCol('empresa'); setPanelSortDir('asc'); }
-                                                }} style={{ cursor: 'pointer' }}>
-                                                    🏢 Empresa {panelSortCol === 'empresa' && (panelSortDir === 'asc' ? '↑' : '↓')}
-                                                </th>
-                                                <th onClick={() => {
-                                                    if (panelSortCol === 'faena') setPanelSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                                                    else { setPanelSortCol('faena'); setPanelSortDir('asc'); }
-                                                }} style={{ cursor: 'pointer' }}>
-                                                    🏘️ Faena {panelSortCol === 'faena' && (panelSortDir === 'asc' ? '↑' : '↓')}
-                                                </th>
-                                                <th onClick={() => {
-                                                    if (panelSortCol === 'cargo') setPanelSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                                                    else { setPanelSortCol('cargo'); setPanelSortDir('asc'); }
-                                                }} style={{ cursor: 'pointer' }}>
-                                                    👷 Cargo {panelSortCol === 'cargo' && (panelSortDir === 'asc' ? '↑' : '↓')}
-                                                </th>
-                                                <th onClick={() => {
-                                                    if (panelSortCol === 'bateria') setPanelSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                                                    else { setPanelSortCol('bateria'); setPanelSortDir('asc'); }
-                                                }} style={{ cursor: 'pointer' }}>
-                                                    📦 Batería / Protocolo {panelSortCol === 'bateria' && (panelSortDir === 'asc' ? '↑' : '↓')}
-                                                </th>
-                                                <th style={{ textAlign: 'right' }}>Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredPaneles.length === 0 ? (
-                                                <tr><td colSpan={5} className="wl-empty">No se encontraron asignaciones con los filtros aplicados.</td></tr>
-                                            ) : (
-                                                filteredPaneles.map(p => (
-                                                    <tr key={p.id} className="wl-row">
-                                                        <td><div style={{ fontWeight: 700 }}>{p.empresas?.nombre}</div></td>
-                                                        <td><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{p.faena_nombre || '—'}</div></td>
-                                                        <td><span className="badge-mini">{p.cargos?.nombre_cargo}</span></td>
-                                                        <td><div style={{ color: 'var(--brand-primary)', fontWeight: 600 }}>📦 {p.baterias?.nombre}</div></td>
-                                                        <td style={{ textAlign: 'right' }}>
-                                                            <div className="wl-actions" style={{ justifyContent: 'flex-end' }}>
-                                                                <button className="btn-icon-sq delete" onClick={async (e) => {
-                                                                    e.stopPropagation();
-                                                                    if (!confirm('¿Eliminar este panel de evaluación?')) return
-                                                                    const { error } = await supabase.from('empresa_cargo_baterias').delete().eq('id', p.id)
-                                                                    if (error) alert(error.message)
-                                                                    fetchData()
-                                                                }}>🗑️</button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                {riesgos.length === 0 && (
+                                    <div className="wl-empty card" style={{ textAlign: 'center', padding: '3rem' }}>
+                                        <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)' }}>No hay riesgos configurados aún.</p>
+                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Haz clic en "+ Nuevo Riesgo" para comenzar a poblar el catálogo.</p>
+                                        <button className="btn btn-outline mt-4" onClick={() => openRiesgoPanel()}>+ Agregar el Primer Riesgo</button>
+                                    </div>
+                                )}
                             </>
                         )}
 
@@ -2180,7 +2394,7 @@ export default function ConfigPage() {
                                                     <td>
                                                         <div className="wl-actions" style={{ justifyContent: 'flex-end' }}>
                                                             <button className="btn-icon-sq edit" onClick={(e) => { e.stopPropagation(); openCategoriaPanel(c); }}>✏️</button>
-                                                            <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteCategoria(c.id); }}>🗑️</button>
+                                                            <button className="btn-icon-sq delete" onClick={(e) => { e.stopPropagation(); deleteCategoria(c.id, c.nombre); }}>🗑️</button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -2214,10 +2428,10 @@ export default function ConfigPage() {
                         <div className="confirm-icon">🗑️</div>
                         <h3>Confirmar Eliminación</h3>
                         <p>¿Estás seguro de eliminar <strong>{deleteConfirm.nombre}</strong>?</p>
-                        <p className="confirm-warning">Esta acción no se puede deshacer y fallará si el examen está en una batería activa.</p>
+                        <p className="confirm-warning">{deleteConfirm.warning}</p>
                         <div className="confirm-actions">
                             <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancelar</button>
-                            <button className="btn btn-danger" onClick={executeDeletePrestacion}>Sí, Eliminar</button>
+                            <button className="btn btn-danger" onClick={executeDelete}>Sí, Eliminar</button>
                         </div>
                     </div>
                 </div>
