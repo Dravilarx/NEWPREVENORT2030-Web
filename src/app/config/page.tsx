@@ -61,7 +61,9 @@ const TIPOS_FORMULARIO: Record<string, { label: string; icon: string; color: str
     alcohol_drogas: { label: 'Alcohol y Drogas', icon: '🍺', color: '#8b5cf6' },
     declaracion_salud: { label: 'Declaración de Salud', icon: '🏥', color: '#0ea5e9' },
     sintomas_respiratorios: { label: 'Síntomas Respiratorios', icon: '🫁', color: '#10b981' },
+    exposicion_silice: { label: 'Exposición a Sílice', icon: '🪨', color: '#f59e0b' },
     encuesta_buceo: { label: 'Encuesta de Buceo', icon: '🤿', color: '#3b82f6' },
+    encuesta_altura: { label: 'Gran Altitud', icon: '🏔️', color: '#8b5cf6' },
 }
 
 interface Bateria {
