@@ -135,15 +135,8 @@ export default function ConsentimientoGeneral({ examId, resultados: res, updateF
 
     return (
         <div className="consentimiento-form card glass">
-            {/* ─── Encabezado del documento (idéntico al Consentimiento de Drogas) ─── */}
+            {/* ─── Encabezado del documento ─── */}
             <div className="consent-header">
-                <div className="consent-logo">
-                    <span className="consent-logo-icon">⚕</span>
-                    <div>
-                        <span className="consent-logo-name">PREVENORT</span>
-                        <span className="consent-logo-sub">Centro Médico</span>
-                    </div>
-                </div>
                 <div style={{ marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.78rem', fontWeight: 700, opacity: 0.7, display: 'block' }}>ÁREA MÉDICA</span>
                     <span style={{ fontSize: '0.7rem', opacity: 0.4 }}>Pasaje Isaac Arce #209 · Fono: 2467600</span>
@@ -159,18 +152,6 @@ export default function ConsentimientoGeneral({ examId, resultados: res, updateF
                     para dar a su empleador el o los resultados de los exámenes médicos y/o de Laboratorio que
                     se realice, si estos fueran requeridos.
                 </p>
-            </div>
-
-            {/* ─── Identificación del paciente ─── */}
-            <div className="consent-id-section">
-                <div className="consent-id-row">
-                    <span className="consent-label-inline">Yo:</span>
-                    <span className="consent-value-line">{res.cgi_nombre || '___________________________'}</span>
-                </div>
-                <div className="consent-id-row">
-                    <span className="consent-label-inline">Rut.:</span>
-                    <span className="consent-value-line">{res.cgi_rut || '_______________'}</span>
-                </div>
             </div>
 
             {/* ─── Texto Legal 2: Autorización entrega de resultados ─── */}
@@ -257,42 +238,6 @@ export default function ConsentimientoGeneral({ examId, resultados: res, updateF
                     border-bottom: 2px solid rgba(255,255,255,0.08);
                 }
 
-                .consent-logo {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 0.8rem;
-                    margin-bottom: 1.2rem;
-                }
-
-                .consent-logo-icon {
-                    font-size: 2rem;
-                    background: rgba(255,107,44,0.15);
-                    width: 48px;
-                    height: 48px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border: 1px solid rgba(255,107,44,0.3);
-                }
-
-                .consent-logo-name {
-                    font-size: 1.4rem;
-                    font-weight: 900;
-                    letter-spacing: 0.15em;
-                    display: block;
-                    color: var(--brand-primary, #ff6b2c);
-                }
-
-                .consent-logo-sub {
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    opacity: 0.5;
-                    letter-spacing: 0.08em;
-                    display: block;
-                }
-
                 .consent-title {
                     font-size: 1.1rem;
                     font-weight: 800;
@@ -301,36 +246,6 @@ export default function ConsentimientoGeneral({ examId, resultados: res, updateF
                     margin: 0.8rem 0 0.3rem 0;
                     text-decoration: underline;
                     text-underline-offset: 4px;
-                }
-
-                .consent-id-section {
-                    margin-bottom: 1.5rem;
-                    padding: 1rem;
-                    border-radius: 12px;
-                    background: rgba(255,255,255,0.02);
-                }
-
-                .consent-id-row {
-                    display: flex;
-                    align-items: baseline;
-                    gap: 0.5rem;
-                    margin-bottom: 0.5rem;
-                    flex-wrap: wrap;
-                }
-
-                .consent-label-inline {
-                    font-weight: 700;
-                    font-size: 0.9rem;
-                    white-space: nowrap;
-                }
-
-                .consent-value-line {
-                    font-weight: 600;
-                    font-size: 0.9rem;
-                    color: var(--brand-primary, #ff6b2c);
-                    border-bottom: 1px solid rgba(255,255,255,0.15);
-                    padding-bottom: 2px;
-                    min-width: 180px;
                 }
 
                 .consent-legal-text {

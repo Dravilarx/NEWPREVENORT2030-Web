@@ -32,11 +32,13 @@ interface Cargo {
 interface Prestacion {
     id: string;
     codigo: string;
+    codigo_fonasa?: string;
     nombre: string;
     categoria: string;
     costo: number;
     descripcion?: string;
     tipo_formulario?: string;
+    estado?: string;
 }
 
 const TIPOS_FORMULARIO: Record<string, { label: string; icon: string; color: string }> = {
@@ -57,6 +59,9 @@ const TIPOS_FORMULARIO: Record<string, { label: string; icon: string; color: str
     consentimiento: { label: 'Consentimiento', icon: '📋', color: '#94a3b8' },
     consentimiento_general: { label: 'Consentimiento General', icon: '📄', color: '#64748b' },
     alcohol_drogas: { label: 'Alcohol y Drogas', icon: '🍺', color: '#8b5cf6' },
+    declaracion_salud: { label: 'Declaración de Salud', icon: '🏥', color: '#0ea5e9' },
+    sintomas_respiratorios: { label: 'Síntomas Respiratorios', icon: '🫁', color: '#10b981' },
+    encuesta_buceo: { label: 'Encuesta de Buceo', icon: '🤿', color: '#3b82f6' },
 }
 
 interface Bateria {
@@ -113,7 +118,7 @@ export default function ConfigPage() {
     // Worklist filter & sort states
     const [wlSearch, setWlSearch] = useState('')
     const [wlCatFilter, setWlCatFilter] = useState('')
-    const [wlSortCol, setWlSortCol] = useState<'codigo' | 'nombre' | 'categoria' | 'descripcion' | 'costo'>('codigo')
+    const [wlSortCol, setWlSortCol] = useState<'codigo' | 'codigo_fonasa' | 'nombre' | 'categoria' | 'descripcion' | 'costo'>('codigo')
     const [wlSortDir, setWlSortDir] = useState<'asc' | 'desc'>('asc')
     const [batSearch, setBatSearch] = useState('')
     const [batSelectorSearch, setBatSelectorSearch] = useState('')
@@ -377,6 +382,11 @@ export default function ConfigPage() {
         tipo_formulario: 'default'
     })
 
+    const [previewResultados, setPreviewResultados] = useState<Record<string, string>>({
+        consent_nombre: 'Juan Pérez Ejemplo',
+        consent_rut: '12.345.678-9',
+    })
+
     const [newBateria, setNewBateria] = useState({
         nombre: '',
         descripcion: '',
@@ -479,15 +489,25 @@ export default function ConfigPage() {
             const text = e.target?.result as string
             const lines = text.split('\n')
 
-            const itemsToRegister = lines.slice(1).filter(l => l.trim().length > 0).map(line => {
-                const parts = line.split(',').map(s => s.trim())
-                const [codigo, nombre, categoria, costo, descripcion] = parts
+            const itemsToRegister = lines.slice(1).filter(l => l.trim().length > 0).map((line, idx) => {
+                const parts = line.split(',')
+                const codigoFonasa = parts[0]?.trim() || ''
+                const nombre = parts[1]?.trim() || ''
+                const categoria = parts[2]?.trim() || 'General'
+                const costo = Number(parts[3]?.trim()) || 0
+                const descripcion = parts.slice(4).join(',').trim() || ''
+
+                // Generar código interno único
+                const internalCode = `BULK-${new Date().getTime().toString().slice(-6)}-${idx.toString().padStart(3, '0')}`
+
                 return {
-                    codigo: codigo,
+                    codigo: internalCode,
+                    codigo_fonasa: codigoFonasa,
                     nombre: nombre,
-                    categoria: categoria || 'General',
-                    costo: Number(costo) || 0,
-                    descripcion: descripcion || ''
+                    categoria: categoria,
+                    costo: costo,
+                    descripcion: descripcion,
+                    estado: 'En revisión'
                 }
             })
 
@@ -497,7 +517,7 @@ export default function ConfigPage() {
                     .upsert(itemsToRegister, { onConflict: 'codigo' })
 
                 if (error) throw error
-                alert(`¡Se han cargado ${itemsToRegister.length} exámenes exitosamente!`)
+                alert(`¡Se han cargado ${itemsToRegister.length} exámenes exitosamente! (En estado de revisión)`)
                 fetchData()
                 closePrestacionBulkPanel()
             } catch (err: unknown) {
@@ -1341,7 +1361,7 @@ export default function ConfigPage() {
                                         </div>
                                         <p className="section-hint">Gestiona los detalles técnicos y comerciales del examen.</p>
 
-                                        <div className="add-form vertical mt-4">
+                                        <div className="add-form vertical mt-4" style={{ overflowY: 'auto', flex: 1, paddingRight: '0.8rem', paddingBottom: '5rem' }}>
                                             <div className="form-group">
                                                 <label>Código Interno</label>
                                                 <input
@@ -1436,35 +1456,32 @@ export default function ConfigPage() {
                                                                 borderRadius: '14px',
                                                                 padding: '1rem',
                                                                 background: 'rgba(0,0,0,0.2)',
-                                                                maxHeight: '500px',
-                                                                overflowY: 'auto',
                                                                 position: 'relative'
                                                             }}>
                                                                 <div style={{
                                                                     position: 'absolute',
                                                                     top: '8px',
                                                                     right: '10px',
-                                                                    fontSize: '0.6rem',
-                                                                    color: 'rgba(255,255,255,0.25)',
-                                                                    background: 'rgba(0,0,0,0.4)',
-                                                                    padding: '2px 8px',
-                                                                    borderRadius: '4px',
+                                                                    fontSize: '0.62rem',
+                                                                    color: '#000',
+                                                                    background: 'var(--brand-primary)',
+                                                                    fontWeight: 900,
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '6px',
                                                                     zIndex: 10,
                                                                     letterSpacing: '0.5px',
-                                                                    textTransform: 'uppercase'
+                                                                    textTransform: 'uppercase',
+                                                                    boxShadow: '0 4px 12px rgba(255,107,44,0.3)'
                                                                 }}>
-                                                                    SOLO LECTURA — Vista Previa
+                                                                    ✨ MODO DE PRUEBA ACTIVA
                                                                 </div>
-                                                                <div style={{ transform: 'scale(0.88)', transformOrigin: 'top left', width: '113.6%', pointerEvents: 'none', opacity: 0.85 }}>
+                                                                <div style={{ transform: 'scale(0.88)', transformOrigin: 'top left', width: '113.6%', opacity: 1, paddingBottom: '2rem' }}>
                                                                     <FormComponent
                                                                         examId="preview"
-                                                                        resultados={{
-                                                                            consent_nombre: 'Juan Pérez Ejemplo',
-                                                                            consent_rut: '12.345.678-9',
-                                                                        }}
-                                                                        updateField={() => { }}
-                                                                        isEditable={false}
-                                                                        isFinalizado={true}
+                                                                        resultados={previewResultados}
+                                                                        updateField={(id, key, val) => setPreviewResultados(prev => ({ ...prev, [key]: val }))}
+                                                                        isEditable={true}
+                                                                        isFinalizado={false}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -1520,7 +1537,7 @@ export default function ConfigPage() {
                                             <div className="bulk-instructions">
                                                 <h4>📋 Formato del CSV</h4>
                                                 <div className="csv-columns" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '1rem' }}>
-                                                    {['Código', 'Nombre', 'Categoría', 'Costo', 'Descripción'].map((col, i) => (
+                                                    {['Código FONASA', 'Nombre', 'Categoría', 'Costo', 'Descripción'].map((col, i) => (
                                                         <span key={col} className="csv-col-tag" style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem' }}>
                                                             <strong style={{ color: 'var(--brand-primary)', marginRight: '4px' }}>{i + 1}</strong>
                                                             {col}
@@ -1535,7 +1552,7 @@ export default function ConfigPage() {
                                                         className="global-manage-btn mt-2"
                                                         style={{ background: 'rgba(255,107,44,0.1)', color: 'var(--brand-primary)', borderColor: 'rgba(255,107,44,0.2)' }}
                                                         onClick={() => {
-                                                            const content = "Código,Nombre,Categoría,Costo,Descripción\nLAB-01,Hemograma Completo,Laboratorio,15000,Examen de sangre completo\nMED-01,Evaluación Médica General,Médico,25000,Evaluación clínica por profesional\nRX-01,Radiografía de Tórax,Rayos X,35000,Estudio de tórax AP/LAT\nPSI-01,Test Psicotécnico Riguroso,Psicotécnico,45000,Batería de tests para conducción\nECG-01,Electrocardiograma Reposo,Electro,18000,Registro de actividad eléctrica cardiaca";
+                                                            const content = "Código_FONASA,Nombre,Categoría,Costo,Descripción\nLAB-01,Hemograma Completo,Laboratorio,15000,Examen de sangre completo\nMED-01,Evaluación Médica General,Médico,25000,Evaluación clínica por profesional\nRX-01,Radiografía de Tórax,Rayos X,35000,Estudio de tórax AP/LAT\nPSI-01,Test Psicotécnico Riguroso,Psicotécnico,45000,Batería de tests para conducción\nECG-01,Electrocardiograma Reposo,Electro,18000,Registro de actividad eléctrica cardiaca";
                                                             const blob = new Blob([content], { type: 'text/csv' });
                                                             const url = window.URL.createObjectURL(blob);
                                                             const a = document.createElement('a');
@@ -1645,7 +1662,10 @@ export default function ConfigPage() {
                                         <thead>
                                             <tr>
                                                 <th className="wl-th-sortable" onClick={() => toggleSort('codigo')}>
-                                                    Código {wlSortCol === 'codigo' && (wlSortDir === 'asc' ? '▲' : '▼')}
+                                                    Cód. Interno {wlSortCol === 'codigo' && (wlSortDir === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th className="wl-th-sortable" onClick={() => toggleSort('codigo_fonasa')}>
+                                                    Cód. FONASA {wlSortCol === 'codigo_fonasa' && (wlSortDir === 'asc' ? '▲' : '▼')}
                                                 </th>
                                                 <th className="wl-th-sortable" onClick={() => toggleSort('nombre')}>
                                                     Nombre {wlSortCol === 'nombre' && (wlSortDir === 'asc' ? '▲' : '▼')}
@@ -1662,11 +1682,17 @@ export default function ConfigPage() {
                                         </thead>
                                         <tbody>
                                             {filteredPrestaciones.length === 0 ? (
-                                                <tr><td colSpan={6} className="wl-empty">No se encontraron exámenes con los filtros aplicados.</td></tr>
+                                                <tr><td colSpan={7} className="wl-empty">No se encontraron exámenes con los filtros aplicados.</td></tr>
                                             ) : filteredPrestaciones.map(p => (
                                                 <tr key={p.id} className="wl-row" onClick={() => openPrestacionPanel(p)}>
                                                     <td><span className="wl-code">{p.codigo}</span></td>
-                                                    <td><strong>{p.nombre}</strong></td>
+                                                    <td><span className="wl-code" style={{ color: '#6366f1' }}>{p.codigo_fonasa || '---'}</span></td>
+                                                    <td>
+                                                        <strong>{p.nombre}</strong>
+                                                        {p.estado === 'En revisión' && (
+                                                            <span style={{ marginLeft: '8px', fontSize: '0.7rem', background: 'rgba(234, 179, 8, 0.2)', color: '#eab308', padding: '2px 6px', borderRadius: '4px' }}>En revisión</span>
+                                                        )}
+                                                    </td>
                                                     <td>
                                                         <span className={`wl-cat-badge wl-cat-${(p.categoria || '').toLowerCase().replace(/ /g, '-')}`}>
                                                             {p.categoria || '—'}
@@ -2515,7 +2541,7 @@ export default function ConfigPage() {
                 }
                 .side-panel.open .side-panel-overlay { opacity: 1; }
                 .side-panel-content {
-                    position: fixed; top: 0 !important; right: -700px; width: 700px; height: 100vh !important;
+                    position: fixed; top: 0 !important; right: -950px; width: 950px; height: 100vh !important;
                     background: #0d0d0d; border-left: 1px solid var(--border-color);
                     padding: 2.5rem; box-shadow: -20px 0 70px rgba(0,0,0,0.6);
                     transition: right 0.5s cubic-bezier(0.16, 1, 0.3, 1);

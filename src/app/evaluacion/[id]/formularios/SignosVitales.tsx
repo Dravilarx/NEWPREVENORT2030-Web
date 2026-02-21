@@ -152,15 +152,7 @@ export default function SignosVitales({ examId, resultados: res, updateField, is
         <div className="vital-signs-table card glass">
             {/* ─── Encabezado ─── */}
             <div className="sv-header">
-                <div className="consent-logo">
-                    <span className="consent-logo-icon">⚕</span>
-                    <div>
-                        <span className="consent-logo-name">PREVENORT</span>
-                        <span className="consent-logo-sub">Centro Médico</span>
-                    </div>
-                </div>
                 <h3 className="sv-title">Control de Signos Vitales</h3>
-                <span className="sv-subtitle">PASAJE ISAAC ARCE N° 209 · FONO: 2467600 · ANTOFAGASTA</span>
             </div>
 
             {/* ─── Tabla principal de signos vitales ─── */}
@@ -467,21 +459,22 @@ export default function SignosVitales({ examId, resultados: res, updateField, is
                 }
 
                 .sv-col-res input, .sv-col-obs input {
-                    background: rgba(255,255,255,0.04);
+                    background: rgba(0,0,0,0.3);
                     border: 1px solid rgba(255,255,255,0.1);
-                    border-radius: 8px;
-                    padding: 0.5rem 0.6rem;
+                    border-radius: 10px;
+                    padding: 0.6rem 0.8rem;
                     color: #fff;
-                    font-weight: 700;
+                    font-weight: 600;
                     font-size: 0.9rem;
                     width: 100%;
-                    transition: border-color 0.2s;
+                    transition: all 0.2s;
                     font-family: inherit;
                 }
                 .sv-col-res input:focus, .sv-col-obs input:focus {
-                    border-color: var(--brand-primary, #ff6b2c);
+                    border-color: #8b5cf6;
+                    background: rgba(0,0,0,0.5);
                     outline: none;
-                    background: rgba(255,107,44,0.05);
+                    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
                 }
                 .sv-col-res input:disabled, .sv-col-obs input:disabled {
                     opacity: 0.5;
@@ -571,19 +564,22 @@ export default function SignosVitales({ examId, resultados: res, updateField, is
                     text-transform: uppercase;
                 }
                 .sv-ruf-item input {
-                    background: rgba(255,255,255,0.04);
+                    background: rgba(0,0,0,0.3);
                     border: 1px solid rgba(255,255,255,0.1);
-                    border-radius: 8px;
-                    padding: 0.5rem;
+                    border-radius: 10px;
+                    padding: 0.8rem 1rem;
                     color: #fff;
-                    font-weight: 700;
-                    font-size: 0.9rem;
+                    font-weight: 600;
+                    font-size: 0.95rem;
                     width: 100%;
+                    transition: all 0.2s;
                     font-family: inherit;
                 }
                 .sv-ruf-item input:focus {
-                    border-color: var(--brand-primary, #ff6b2c);
+                    border-color: #8b5cf6;
+                    background: rgba(0,0,0,0.5);
                     outline: none;
+                    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
                 }
                 .sv-ruf-item input:disabled { opacity: 0.5; cursor: not-allowed; }
                 .sv-ruf-hint { font-size: 0.6rem; opacity: 0.3; font-style: italic; }
@@ -620,19 +616,22 @@ export default function SignosVitales({ examId, resultados: res, updateField, is
                     text-transform: uppercase;
                 }
                 .sv-resp-col input {
-                    background: rgba(255,255,255,0.04);
+                    background: rgba(0,0,0,0.3);
                     border: 1px solid rgba(255,255,255,0.1);
-                    border-radius: 8px;
-                    padding: 0.5rem;
+                    border-radius: 10px;
+                    padding: 0.8rem 1rem;
                     color: #fff;
-                    font-weight: 700;
-                    font-size: 0.85rem;
+                    font-weight: 600;
+                    font-size: 0.95rem;
                     width: 100%;
+                    transition: all 0.2s;
                     font-family: inherit;
                 }
                 .sv-resp-col input:focus {
-                    border-color: var(--brand-primary, #ff6b2c);
+                    border-color: #8b5cf6;
+                    background: rgba(0,0,0,0.5);
                     outline: none;
+                    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
                 }
                 .sv-resp-col input:disabled { opacity: 0.5; cursor: not-allowed; }
 

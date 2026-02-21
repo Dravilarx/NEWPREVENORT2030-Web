@@ -25,54 +25,12 @@ export default function TestVisual({ examId, resultados: res, updateField, isEdi
         <div className="vt-content card glass">
             {/* Cabecera */}
             <div className="vt-header">
-                <div className="vt-logo-wrap">
-                    <span className="vt-logo-icon">👁️</span>
-                    <div className="vt-logo-text">
-                        <span className="vt-logo-main">PREVENORT</span>
-                        <span className="vt-logo-sub">Salud Ocupacional</span>
-                    </div>
-                </div>
                 <h3 className="vt-title">TEST VISUAL MÉDICO</h3>
                 <div className="vt-header-divider" />
             </div>
 
             {/* I. Datos Personales y Lentes */}
             <div className="vt-section">
-                <div className="vt-section-header">
-                    <span className="vt-section-icon">👤</span>
-                    <h4 className="vt-section-title">I. DATOS PERSONALES Y LENTES</h4>
-                </div>
-
-                <div className="vt-personal-grid mb-6">
-                    <div className="vt-field">
-                        <label>NOMBRE</label>
-                        <input type="text" value={res.v_paciente_nombre || ''} onChange={e => updateField(examId, 'v_paciente_nombre', e.target.value)} disabled={disabled} />
-                    </div>
-                    <div className="vt-field">
-                        <label>EDAD</label>
-                        <input type="text" value={res.v_paciente_edad || ''} onChange={e => updateField(examId, 'v_paciente_edad', e.target.value)} disabled={disabled} />
-                    </div>
-                    <div className="vt-field">
-                        <label>FECHA</label>
-                        <input type="text" value={res.v_fecha || ''} onChange={e => updateField(examId, 'v_fecha', e.target.value)} disabled={disabled} />
-                    </div>
-                    <div className="vt-field">
-                        <label>RUT</label>
-                        <input type="text" value={res.v_paciente_rut || ''} onChange={e => updateField(examId, 'v_paciente_rut', e.target.value)} disabled={disabled} />
-                    </div>
-                    <div className="vt-field">
-                        <label>SEXO</label>
-                        <input type="text" value={res.v_paciente_sexo || ''} onChange={e => updateField(examId, 'v_paciente_sexo', e.target.value)} disabled={disabled} />
-                    </div>
-                    <div className="vt-field">
-                        <label>EMPRESA</label>
-                        <input type="text" value={res.v_empresa || ''} onChange={e => updateField(examId, 'v_empresa', e.target.value)} disabled={disabled} />
-                    </div>
-                    <div className="vt-field">
-                        <label>CARGO</label>
-                        <input type="text" value={res.v_cargo || ''} onChange={e => updateField(examId, 'v_cargo', e.target.value)} disabled={disabled} />
-                    </div>
-                </div>
 
                 <div className="vt-lentes-container">
                     <span className="vt-lentes-label">USO DE LENTES:</span>
@@ -262,29 +220,7 @@ export default function TestVisual({ examId, resultados: res, updateField, isEdi
                 .vt-section-title { font-size: 0.8rem; font-weight: 900; opacity: 0.6; letter-spacing: 0.12em; text-transform: uppercase; color: #a78bfa; }
 
                 /* Personal Data Grid */
-                .vt-personal-grid { 
-                    display: grid; 
-                    grid-template-columns: repeat(4, 1fr); 
-                    gap: 1rem; 
-                    background: rgba(255,255,255,0.02); 
-                    padding: 1.5rem; 
-                    border-radius: 20px; 
-                    border: 1px solid rgba(255,255,255,0.05);
-                }
-                .vt-field { display: flex; flex-direction: column; gap: 0.4rem; }
-                .vt-field:first-child { grid-column: span 2; }
-                .vt-field label { font-size: 0.6rem; font-weight: 900; opacity: 0.4; letter-spacing: 0.1em; padding-left: 0.2rem; }
-                .vt-field input { 
-                    background: rgba(0,0,0,0.3); 
-                    border: 1px solid rgba(255,255,255,0.1); 
-                    border-radius: 10px; 
-                    padding: 0.6rem 1rem; 
-                    color: #fff; 
-                    font-size: 0.9rem; 
-                    font-weight: 600; 
-                }
-                .vt-field input:focus { border-color: #8b5cf6; background: rgba(0,0,0,0.5); outline: none; }
-                .mb-6 { margin-bottom: 1.5rem; }
+                .vt-section-title { font-size: 0.8rem; font-weight: 900; opacity: 0.6; letter-spacing: 0.12em; text-transform: uppercase; color: #a78bfa; }
 
                 /* Lentes */
                 .vt-lentes-container { background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
@@ -370,7 +306,6 @@ export default function TestVisual({ examId, resultados: res, updateField, isEdi
                     .vt-depth-grid { grid-template-columns: 1fr; }
                     .vt-tm-head, .vt-tm-row { grid-template-columns: 1.5fr repeat(4, 1fr); padding: 0.5rem; }
                     .vt-tm-label { font-size: 0.75rem; }
-                    .vt-personal-grid { grid-template-columns: 1fr 1fr; }
                 }
             `}</style>
         </div>

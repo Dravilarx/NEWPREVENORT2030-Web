@@ -293,7 +293,16 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
     return (
         <div className="evaluacion-detalle animate-fade">
             <header className="page-header">
-                <button onClick={() => router.back()} className="back-link">← Volver a Lista</button>
+                <div className="top-nav-bar">
+                    <button onClick={() => router.back()} className="back-link">← Volver a Lista</button>
+                    <div className="current-user-badge">
+                        <span className="user-icon">👤</span>
+                        <div className="user-info">
+                            <span className="user-name">Profesional en turno</span>
+                            <span className="user-role">DNI Autenticado</span>
+                        </div>
+                    </div>
+                </div>
                 <div className="header-flex">
                     <div className="worker-core-info">
                         <div className="status-row">
@@ -395,52 +404,47 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                                                         <label>{ex.prestaciones.nombre}</label>
                                                         <span className="rol-tag">{ex.rol_asignado}</span>
                                                     </div>
-                                                    <div className="status-tag-mini">
-                                                        {ex.estado === 'finalizado' ? '✅ COMPLETO' : '⏳ PENDIENTE'}
+
+                                                    <div className="header-actions-area">
+                                                        <div className="mini-dropzone-wrap">
+                                                            {res.documento_url ? (
+                                                                <div className="mini-file-preview">
+                                                                    <span className="file-icon">📄</span>
+                                                                    <a href={res.documento_url} target="_blank" className="btn-view-mini">Ver PDF</a>
+                                                                    {isEditable && <button className="btn-reset-mini" onClick={() => updateExamField(ex.id, 'documento_url', '')}>✕</button>}
+                                                                </div>
+                                                            ) : (
+                                                                <div
+                                                                    className={`mini-dropzone ${isAnalizando ? 'analizando' : ''}`}
+                                                                    onDragOver={(e) => e.preventDefault()}
+                                                                    onDrop={(e) => { e.preventDefault(); handleFileDrop(ex.id, e.dataTransfer.files) }}
+                                                                    onClick={() => isEditable && document.getElementById(`file-${ex.id}`)?.click()}
+                                                                >
+                                                                    {isAnalizando ? (
+                                                                        <span>Analizando IA...</span>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="icon">📄</span>
+                                                                            <span>Subir / Arrastrar Resultado</span>
+                                                                        </>
+                                                                    )}
+                                                                    <input
+                                                                        type="file"
+                                                                        id={`file-${ex.id}`}
+                                                                        hidden
+                                                                        onChange={(e) => e.target.files && handleFileDrop(ex.id, e.target.files)}
+                                                                        disabled={!isEditable}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="status-tag-mini">
+                                                            {ex.estado === 'finalizado' ? '✅ COMPLETO' : '⏳ PENDIENTE'}
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 <div className="exam-grid-container">
-                                                    <div className="dropzone-area">
-                                                        {res.documento_url ? (
-                                                            <div className="file-preview">
-                                                                <div className="file-info-row">
-                                                                    <span className="file-icon">📄</span>
-                                                                    <span className="file-name">Documento Escaneado</span>
-                                                                </div>
-                                                                <div className="file-actions">
-                                                                    <a href={res.documento_url} target="_blank" className="btn-view">Ver Archivo</a>
-                                                                    {isEditable && <button className="btn-reset" onClick={() => updateExamField(ex.id, 'documento_url', '')}>Cambiar</button>}
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                className={`dropzone ${isAnalizando ? 'analizando' : ''}`}
-                                                                onDragOver={(e) => e.preventDefault()}
-                                                                onDrop={(e) => { e.preventDefault(); handleFileDrop(ex.id, e.dataTransfer.files) }}
-                                                                onClick={() => isEditable && document.getElementById(`file-${ex.id}`)?.click()}
-                                                            >
-                                                                {isAnalizando ? (
-                                                                    <div className="ai-analysing">
-                                                                        <div className="scanner-line"></div>
-                                                                        <span>Analizando...</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="dz-content">
-                                                                        <span className="icon">📄</span>
-                                                                        <p>Arrastrar o <strong>Click</strong> para subir</p>
-                                                                        <input
-                                                                            type="file"
-                                                                            id={`file-${ex.id}`}
-                                                                            hidden
-                                                                            onChange={(e) => e.target.files && handleFileDrop(ex.id, e.target.files)}
-                                                                            disabled={!isEditable}
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
 
                                                     <div className="data-entry-area">
                                                         {(() => {
@@ -555,6 +559,16 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                 .page-header {
                     margin-bottom: 3rem;
                 }
+
+                .top-nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+                .back-link { background: none; border: none; font-size: 0.9rem; font-weight: 700; color: rgba(255,255,255,0.7); cursor: pointer; transition: 0.2s; padding: 0.5rem 1rem; border-radius: 8px; margin-left: -1rem; text-decoration: none; display: inline-block; }
+                .back-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+                
+                .current-user-badge { display: flex; align-items: center; gap: 0.8rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 0.5rem 1.2rem; border-radius: 24px; }
+                .user-icon { font-size: 1.2rem; }
+                .user-info { display: flex; flex-direction: column; }
+                .user-name { font-size: 0.75rem; font-weight: 800; color: #10b981; }
+                .user-role { font-size: 0.65rem; color: rgba(16,185,129,0.7); text-transform: uppercase; font-weight: 900; }
 
                 .header-flex {
                     display: flex;
@@ -729,6 +743,50 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 1.5rem;
+                    gap: 1rem;
+                }
+
+                .header-actions-area {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
+                .mini-dropzone {
+                    border: 1px dashed rgba(255,255,255,0.2);
+                    border-radius: 8px;
+                    padding: 0.5rem 1rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    cursor: pointer;
+                    background: rgba(255,255,255,0.02);
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                    color: rgba(255,255,255,0.7);
+                    transition: all 0.2s;
+                    white-space: nowrap;
+                }
+                .mini-dropzone:hover { border-color: var(--brand-primary); color: #fff; background: rgba(255,107,44,0.05); }
+                .mini-dropzone.analizando { border-color: #3b82f6; color: #3b82f6; animation: pulse 1s infinite alternate; }
+
+                .mini-file-preview {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    background: rgba(16, 185, 129, 0.1);
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                    padding: 0.4rem 0.8rem;
+                    border-radius: 8px;
+                }
+                .btn-view-mini { font-size: 0.75rem; font-weight: 800; color: #10b981; text-decoration: none; }
+                .btn-view-mini:hover { text-decoration: underline; }
+                .btn-reset-mini { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.8rem; }
+                .btn-reset-mini:hover { background: rgba(239, 68, 68, 0.4); }
+
+                @keyframes pulse {
+                    from { opacity: 0.6; }
+                    to { opacity: 1; }
                 }
 
                 .name-box label {
@@ -750,43 +808,8 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
 
                 .exam-grid-container {
                     display: grid;
-                    grid-template-columns: 280px 1fr;
+                    grid-template-columns: 1fr;
                     gap: 1.5rem;
-                }
-
-                .dropzone {
-                    border: 2px dashed rgba(255,255,255,0.1);
-                    border-radius: 16px;
-                    padding: 1rem;
-                    text-align: center;
-                    cursor: pointer;
-                    background: rgba(255,255,255,0.01);
-                    height: 160px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    position: relative;
-                }
-
-                .dropzone:hover { border-color: var(--brand-primary); background: rgba(255,107,44,0.02); }
-                .dropzone.analizando { border-color: #3b82f6; overflow: hidden; }
-                
-                .dz-content .icon { font-size: 1.5rem; margin-bottom: 0.5rem; display: block; }
-                .dz-content p { font-size: 0.8rem; margin: 0.5rem 0; color: rgba(255,255,255,0.4); }
-
-                .ai-analysing { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-                .scanner-line { width: 100%; height: 2px; background: #3b82f6; position: absolute; top: 0; left: 0; animation: scan 2s linear infinite; box-shadow: 0 0 15px #3b82f6; }
-                @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
-
-                .file-preview { 
-                    background: #0f172a; 
-                    border-radius: 16px; 
-                    padding: 1.2rem; 
-                    border: 1px solid rgba(255,255,255,0.1); 
-                    height: 160px; 
-                    display: flex; 
-                    flex-direction: column; 
-                    justify-content: space-between; 
                 }
 
                 .data-entry-area { display: flex; flex-direction: column; gap: 1rem; }
@@ -969,10 +992,53 @@ export default function EvaluacionDetallePage({ params }: { params: Promise<{ id
                 }
 
                 @media (max-width: 768px) {
+                    .evaluacion-detalle { padding: 1rem; }
+                    .page-header { margin-bottom: 1.5rem; }
+                    .top-nav-bar { margin-bottom: 1.5rem; }
+                    .current-user-badge { padding: 0.4rem 0.8rem; }
+                    .header-flex { flex-direction: column; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; border-bottom: none; }
+                    .cargo-badge { width: 100%; text-align: left; display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 0.8rem 1rem; }
+                    .cargo-badge .label { margin-bottom: 0; font-size: 0.6rem; }
+                    .cargo-badge .value { font-size: 1rem; }
+                    
+                    /* Horizontal scrolling for stations on mobile */
+                    .station-selector-grid { 
+                        display: flex; 
+                        flex-wrap: nowrap; 
+                        overflow-x: auto; 
+                        gap: 0.5rem; 
+                        padding-bottom: 1rem;
+                        scroll-snap-type: x mandatory;
+                    }
+                    .station-selector-grid::-webkit-scrollbar { display: none; }
+                    .station-card { 
+                        flex: 0 0 calc(85vw - 2rem); 
+                        scroll-snap-align: center; 
+                        padding: 1rem;
+                    }
+                    
+                    /* Inputs more touch-friendly */
+                    .form-section input, .form-section select, .form-section textarea,
+                    .btn, .mini-dropzone, .photo-upload-btn, .mini-file-preview {
+                        min-height: 48px;
+                    }
+
+                    .exam-row { padding: 1rem; border-radius: 16px; margin-bottom: 1rem; }
+                    .exam-info-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; margin-bottom: 1rem; }
+                    .header-actions-area { width: 100%; flex-direction: column; align-items: stretch; }
+                    .mini-dropzone-wrap { width: 100%; }
+                    .mini-dropzone { width: 100%; justify-content: center; padding: 0.8rem; font-size: 0.85rem; }
+                    .mini-file-preview { width: 100%; justify-content: space-between; }
+                    .status-tag-mini { display: none; }
+                    .name-box label { font-size: 1rem; }
+                    
                     .epworth-row { flex-direction: column; align-items: flex-start; }
                     .romberg-row, .ecg-hallazgo-row, .psico-row, .med-sistema-row { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
                     .fram-grid, .ecg-params-grid, .lab-grid { grid-template-columns: 1fr 1fr; }
                     .med-grid { grid-template-columns: 1fr; }
+                    .form-actions-footer { flex-direction: column; gap: 1.5rem; text-align: center; padding: 1.5rem; border-radius: 24px; }
+                    .footer-btns { width: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
+                    .footer-btns button { width: 100%; }
                 }
 
                 .empty-state {

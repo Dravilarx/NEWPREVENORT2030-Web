@@ -136,27 +136,7 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
         <div className="consentimiento-form card glass">
             {/* ─── Encabezado del documento ─── */}
             <div className="consent-header">
-                <div className="consent-logo">
-                    <span className="consent-logo-icon">⚕</span>
-                    <div>
-                        <span className="consent-logo-name">PREVENORT</span>
-                        <span className="consent-logo-sub">Centro Médico</span>
-                    </div>
-                </div>
                 <h3 className="consent-title">Carta de Consentimiento Para Examen de Drogas</h3>
-            </div>
-
-            {/* ─── Identificación del paciente ─── */}
-            <div className="consent-id-section">
-                <div className="consent-id-row">
-                    <span className="consent-label-inline">Yo:</span>
-                    <span className="consent-value-line">{res.consent_nombre || '___________________________'}</span>
-                </div>
-                <div className="consent-id-row">
-                    <span className="consent-label-inline">RUT Nº:</span>
-                    <span className="consent-value-line">{res.consent_rut || '_______________'}</span>
-                    <span className="consent-label-inline" style={{ marginLeft: '1rem' }}>Mediante la presente DECLARO:</span>
-                </div>
             </div>
 
             {/* ─── Texto Legal (solo lectura) ─── */}
@@ -261,78 +241,12 @@ export default function Consentimiento({ examId, resultados: res, updateField, i
                     border-bottom: 2px solid rgba(255,255,255,0.08);
                 }
 
-                .consent-logo {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 0.8rem;
-                    margin-bottom: 1.5rem;
-                }
-
-                .consent-logo-icon {
-                    font-size: 2rem;
-                    background: rgba(255,107,44,0.15);
-                    width: 48px;
-                    height: 48px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border: 1px solid rgba(255,107,44,0.3);
-                }
-
-                .consent-logo-name {
-                    font-size: 1.4rem;
-                    font-weight: 900;
-                    letter-spacing: 0.15em;
-                    display: block;
-                    color: var(--brand-primary, #ff6b2c);
-                }
-
-                .consent-logo-sub {
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    opacity: 0.5;
-                    letter-spacing: 0.08em;
-                    display: block;
-                }
-
                 .consent-title {
                     font-size: 1.1rem;
                     font-weight: 800;
                     letter-spacing: 0.02em;
                     color: #fff;
                     margin: 0;
-                }
-
-                .consent-id-section {
-                    margin-bottom: 1.5rem;
-                    padding: 1rem;
-                    border-radius: 12px;
-                    background: rgba(255,255,255,0.02);
-                }
-
-                .consent-id-row {
-                    display: flex;
-                    align-items: baseline;
-                    gap: 0.5rem;
-                    margin-bottom: 0.5rem;
-                    flex-wrap: wrap;
-                }
-
-                .consent-label-inline {
-                    font-weight: 700;
-                    font-size: 0.9rem;
-                    white-space: nowrap;
-                }
-
-                .consent-value-line {
-                    font-weight: 600;
-                    font-size: 0.9rem;
-                    color: var(--brand-primary, #ff6b2c);
-                    border-bottom: 1px solid rgba(255,255,255,0.15);
-                    padding-bottom: 2px;
-                    min-width: 180px;
                 }
 
                 .consent-legal-text {

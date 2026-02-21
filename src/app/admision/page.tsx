@@ -108,9 +108,9 @@ export default function AdmisionPage() {
     const stats = useMemo(() => {
         const todayStr = new Date().toISOString().split('T')[0]
         return {
-            enAgenda: recentAdmisions.filter(at => at.estado_aptitud === 'pendiente' || at.estado_aptitud === 'remediacion' || at.estado_aptitud === 'en_atencion').length,
-            aptosHoy: recentAdmisions.filter(at => at.estado_aptitud === 'apto' && (at.fecha_atencion?.startsWith(todayStr) || at.created_at.startsWith(todayStr))).length,
-            noAptos: recentAdmisions.filter(at => at.estado_aptitud === 'no_apto').length
+            enAgenda: recentAdmisions.filter(at => ['en_espera', 'en_atencion', 'pendiente', 'remediacion'].includes(at.estado_aptitud)).length,
+            aptosHoy: recentAdmisions.filter(at => ['apto', 'apto_r'].includes(at.estado_aptitud) && (at.fecha_atencion?.startsWith(todayStr) || at.created_at.startsWith(todayStr))).length,
+            noAptos: recentAdmisions.filter(at => ['no_apto', 'no_apto_r'].includes(at.estado_aptitud)).length
         }
     }, [recentAdmisions])
 
@@ -301,7 +301,7 @@ export default function AdmisionPage() {
                 (at.empresas?.nombre || '').toLowerCase().includes(q) ||
                 (at.nro_ot || '').toLowerCase().includes(q)
 
-            const isFinalizado = at.estado_aptitud === 'apto' || at.estado_aptitud === 'no_apto'
+            const isFinalizado = ['apto', 'no_apto', 'apto_r', 'no_apto_r'].includes(at.estado_aptitud)
 
             if (verArchivados) return matchesSearch && isFinalizado
             return matchesSearch && !isFinalizado
@@ -346,7 +346,7 @@ export default function AdmisionPage() {
                 trabajador_id: currentWorkerId,
                 empresa_id: empresaId,
                 cargo_id: cargoId,
-                estado_aptitud: 'pendiente'
+                estado_aptitud: 'en_espera'
             }]).select().single()
 
             if (aError) throw aError
@@ -365,6 +365,9 @@ export default function AdmisionPage() {
 
             closeAdmisionPanel()
             fetchRecentAdmisions()
+        } catch (err: any) {
+            console.error('Error en Admisión:', err)
+            alert('Error al crear la admisión: ' + (err.message || 'Error desconocido'))
         } finally {
             setLoading(false)
         }
@@ -426,7 +429,7 @@ export default function AdmisionPage() {
                         trabajador_id: worker.id,
                         empresa_id: matchedEmpresa.id,
                         cargo_id: matchedCargo.id,
-                        estado_aptitud: 'pendiente'
+                        estado_aptitud: 'en_espera'
                     }).select().single()
 
                     if (aError) continue
@@ -496,7 +499,7 @@ export default function AdmisionPage() {
                 </div>
             </div>
 
-            <div className="main-content card glass mt-6">
+            <div className="admission-content card glass mt-6">
                 <div className="search-bar">
                     <span className="search-icon">🔍</span>
                     <input
@@ -549,7 +552,7 @@ export default function AdmisionPage() {
                                     <td>{at.fecha_atencion ? new Date(at.fecha_atencion).toLocaleDateString() : <span style={{ fontStyle: 'italic', opacity: 0.5 }}>Pendiente</span>}</td>
                                     <td>
                                         <span className={`badge badge-${at.estado_aptitud.toLowerCase()}`}>
-                                            {at.estado_aptitud.toUpperCase()}
+                                            {at.estado_aptitud === 'apto_r' ? 'APTO (R)' : at.estado_aptitud === 'no_apto_r' ? 'NO APTO (R)' : at.estado_aptitud.replace('_', ' ').toUpperCase()}
                                         </span>
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
@@ -718,7 +721,7 @@ export default function AdmisionPage() {
                                 <div className="detail-card">
                                     <span className="detail-card-label">Estado</span>
                                     <span className={`badge badge-${selectedAtencion.estado_aptitud.toLowerCase()}`}>
-                                        {selectedAtencion.estado_aptitud.toUpperCase()}
+                                        {selectedAtencion.estado_aptitud === 'apto_r' ? 'APTO (R)' : selectedAtencion.estado_aptitud === 'no_apto_r' ? 'NO APTO (R)' : selectedAtencion.estado_aptitud.replace('_', ' ').toUpperCase()}
                                     </span>
                                 </div>
                             </div>
@@ -753,7 +756,7 @@ export default function AdmisionPage() {
                 .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; }
                 .glass { backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
 
-                .main-content { padding: 0; margin-top: 1.5rem; width: 100%; }
+                .admission-content { padding: 0; margin-top: 1.5rem; width: 100%; }
                 .search-bar { display: flex; align-items: center; gap: 1rem; padding: 1.2rem 2rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.05); }
                 .search-bar input { background: transparent; border: none; color: #fff; width: 100%; font-size: 1.1rem; outline: none; }
                 
@@ -765,10 +768,13 @@ export default function AdmisionPage() {
                 .ot-tag { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--brand-primary); font-weight: 700; background: rgba(255,107,44,0.1); padding: 0.3rem 0.6rem; border-radius: 6px; }
                 
                 .badge { font-size: 0.7rem; font-weight: 800; padding: 0.3rem 0.8rem; border-radius: 20px; }
-                .badge-pendiente { background: rgba(255,255,255,0.1); color: #fff; }
+                .badge-en_espera { background: rgba(255,255,255,0.1); color: #fff; }
+                .badge-pendiente { background: rgba(255,165,0,0.15); color: #ffa500; }
                 .badge-en_atencion { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
                 .badge-apto { background: rgba(34,197,94,0.15); color: #22c55e; }
+                .badge-apto_r { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.4); }
                 .badge-no_apto { background: rgba(239,68,68,0.15); color: #ef4444; }
+                .badge-no_apto_r { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
                 .badge-remediacion { background: rgba(168,85,247,0.15); color: #a855f7; }
 
                 .btn-mini { padding: 0.4rem 0.8rem; font-size: 0.75rem; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; transition: 0.2s; }

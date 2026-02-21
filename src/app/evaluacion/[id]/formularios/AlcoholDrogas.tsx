@@ -107,41 +107,8 @@ export default function AlcoholDrogas({ examId, resultados: res, updateField, is
         <div className="ad-content card glass">
             {/* Cabecera */}
             <div className="ad-header">
-                <div className="ad-logo-wrap">
-                    <span className="ad-logo-icon">🧪</span>
-                    <div className="ad-logo-text">
-                        <span className="ad-logo-main">PREVENORT</span>
-                        <span className="ad-logo-sub">Laboratorio Clínico</span>
-                    </div>
-                </div>
                 <h3 className="ad-title">DETECCIÓN DE ALCOHOL Y DROGAS EN ORINA</h3>
                 <div className="ad-header-divider" />
-            </div>
-
-            {/* Antecedentes */}
-            <div className="ad-section">
-                <div className="ad-section-header">
-                    <span className="ad-section-icon">👤</span>
-                    <h4 className="ad-section-title">ANTECEDENTES PERSONALES</h4>
-                </div>
-                <div className="ad-grid ad-grid-2">
-                    <div className="ad-field full-width">
-                        <label>NOMBRE COMPLETO</label>
-                        <input type="text" value={res.ad_paciente_nombre || ''} onChange={e => updateField(examId, 'ad_paciente_nombre', e.target.value)} disabled={disabled} placeholder="Nombre del trabajador" />
-                    </div>
-                    <div className="ad-field">
-                        <label>RUT / IDENTIFICACIÓN</label>
-                        <input type="text" value={res.ad_paciente_rut || ''} onChange={e => updateField(examId, 'ad_paciente_rut', e.target.value)} disabled={disabled} placeholder="RUT" />
-                    </div>
-                    <div className="ad-field">
-                        <label>N° ORDEN (OT)</label>
-                        <input type="text" value={res.ad_ot || ''} onChange={e => updateField(examId, 'ad_ot', e.target.value)} disabled={disabled} placeholder="Ej: 31908" />
-                    </div>
-                    <div className="ad-field full-width">
-                        <label>FECHA DE EVALUACIÓN</label>
-                        <input type="text" value={res.ad_fecha || getFechaFormateada()} onChange={e => updateField(examId, 'ad_fecha', e.target.value)} disabled={disabled} />
-                    </div>
-                </div>
             </div>
 
             {/* Resultados */}
@@ -247,11 +214,6 @@ export default function AlcoholDrogas({ examId, resultados: res, updateField, is
                 .ad-content { padding: 2rem; }
                 
                 .ad-header { text-align: center; margin-bottom: 2.5rem; }
-                .ad-logo-wrap { display: flex; align-items: center; justify-content: center; gap: 0.8rem; margin-bottom: 1rem; }
-                .ad-logo-icon { font-size: 2rem; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.4)); }
-                .ad-logo-text { text-align: left; }
-                .ad-logo-main { display: block; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.1em; color: #fff; }
-                .ad-logo-sub { display: block; font-size: 0.65rem; font-weight: 700; opacity: 0.5; text-transform: uppercase; }
                 .ad-title { font-size: 1.4rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
                 .ad-header-divider { height: 2px; width: 60px; background: #8b5cf6; margin: 1.5rem auto 0; border-radius: 2px; opacity: 0.5; }
 

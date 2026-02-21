@@ -25,6 +25,9 @@ import ConsentimientoGeneral from './ConsentimientoGeneral'
 import Laboratorio from './Laboratorio'
 import Radiologia from './Radiologia'
 import AlcoholDrogas from './AlcoholDrogas'
+import DeclaracionSalud from './DeclaracionSalud'
+import SintomasRespiratorios from './SintomasRespiratorios'
+import EncuestaBuceo from './EncuestaBuceo'
 import DefaultForm from './DefaultForm'
 
 import type { FormularioProps } from './types'
@@ -48,6 +51,9 @@ export const FORM_REGISTRY: Record<string, ComponentType<FormularioProps>> = {
     laboratorio: Laboratorio,
     radiologia: Radiologia,
     alcohol_drogas: AlcoholDrogas,
+    declaracion_salud: DeclaracionSalud,
+    sintomas_respiratorios: SintomasRespiratorios,
+    encuesta_buceo: EncuestaBuceo,
 }
 
 /** Obtiene el componente de formulario correcto dado un tipo_formulario */
